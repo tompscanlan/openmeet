@@ -1,0 +1,33 @@
+# fly.toml app configuration file generated for openmeet on 2024-08-24T22:26:43-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'openmeet'
+primary_region = 'atl'
+
+[build]
+  dockerfile = "./Dockerfile"
+
+[http_service]
+  internal_port = 5984
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[env]
+  COUCHDB_USER = "tscanlan"
+
+  ERL_FLAGS="-couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/default.d/ /opt/couchdb/etc/local.d /opt/couchdb/etc/local.ini /opt/couchdb/data/persistence.ini"
+
+[mounts]
+  source="couchdata"
+  destination="/opt/couchdb/data"
+

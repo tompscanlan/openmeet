@@ -1,0 +1,77 @@
+version: '3'
+services:
+  couchdb1:
+    container_name: couchdb1
+    image: couchdb:3
+    command: >
+      bash -c "
+        while ! curl -s http://global:butterball@localhost:5984; do
+          sleep 1;
+        done;
+        curl -X PUT http://global:butterball@localhost:5984/_users;
+        curl -X PUT http://global:butterball@localhost:5984/_replicator;
+        curl -X PUT http://global:butterball@localhost:5984/_global_changes;
+        exec /docker-entrypoint.sh couchdb
+      "
+    environment:
+      - COUCHDB_USER=global
+      - COUCHDB_PASSWORD=butterball
+      - COUCHDB_NODENAME=couchdb1
+      - COUCHDB_CLUSTER_PORT_NUMBER=9100
+      - COUCHDB_CREATE_DATABASES=yes
+    ports:
+      - '35984:5984'
+      - '34369:4369'
+      - '39100:9100'
+    volumes:
+      - couchdb1_data:/opt/couchdb/data
+    networks:
+      - couchdb_network
+
+  couchdb2:
+    container_name: couchdb2
+    image: couchdb:3
+    environment:
+      - COUCHDB_USER=global
+      - COUCHDB_PASSWORD=butterball
+      - COUCHDB_NODENAME=couchdb2
+      - COUCHDB_CLUSTER_PORT_NUMBER=19100
+      - COUCHDB_CREATE_DATABASES=no
+    ports:
+      - '15984:5984'
+      - '14369:4369'
+      - '19100:9100'
+    volumes:
+      - couchdb2_data:/opt/couchdb/data
+    networks:
+      - couchdb_network
+
+  couchdb3:
+    container_name: couchdb3
+    image: couchdb:3
+    environment:
+      - COUCHDB_USER=global
+      - COUCHDB_PASSWORD=butterball
+      - COUCHDB_NODENAME=couchdb3
+      - COUCHDB_CLUSTER_PORT_NUMBER=29100
+      - COUCHDB_CREATE_DATABASES=no
+    ports:
+      - '25984:5984'
+      - '24369:4369'
+      - '29100:9100'
+    volumes:
+      - couchdb3_data:/opt/couchdb/data
+    networks:
+      - couchdb_network
+
+volumes:
+  couchdb1_data:
+    driver: local
+  couchdb2_data:
+    driver: local
+  couchdb3_data:
+    driver: local
+
+networks:
+  couchdb_network:
+    driver: bridge
