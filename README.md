@@ -14,3 +14,71 @@ Since TypeScript cannot handle type information for `.vue` imports, they are shi
 2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
 
 You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+
+
+# installing couchdb
+
+```
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl apt-transport-https gnupg
+curl https://couchdb.apache.org/repo/keys.asc | gpg --dearmor | sudo tee /usr/share/keyrings/couchdb-archive-keyring.gpg >/dev/null 2>&1
+echo "deb [signed-by=/usr/share/keyrings/couchdb-archive-keyring.gpg] https://apache.jfrog.io/artifactory/couchdb-deb/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/couchdb.list >/dev/null
+
+sudo apt update
+sudo apt install -y couchdb
+
+sudo apt install -y nginx
+
+sudo apt install -y certbot python3-certbot-nginx
+
+
+```
+
+Configure Nginx as a reverse proxy for CouchDB. Create a new file /etc/nginx/sites-available/couchdb:
+
+```
+server {
+    listen 80;
+    server_name your_domain.com;
+
+    location / {
+        proxy_pass http://localhost:5984;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+
+```
+sudo ln -s /etc/nginx/sites-available/couchdb /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot --nginx -d your_domain.com
+
+```
+
+Update CouchDB configuration to bind to localhost only. Edit /opt/couchdb/etc/local.ini:
+
+```
+[chttpd]
+bind_address = 127.0.0.1
+```
+
+```
+sudo systemctl restart couchdb
+sudo certbot renew --dry-run
+sudo systemctl enable certbot.timer
+sudo systemctl start certbot.timer
+```
+
+To customize the renewal process, you can create a renewal hook. This is useful for reloading Nginx after renewal. Create a file /etc/letsencrypt/renewal-hooks/deploy/01-reload-nginx:
+
+```
+#!/bin/bash
+nginx -t && systemctl reload nginx
+```
+```
+sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/01-reload-nginx
+```
