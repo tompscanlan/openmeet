@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use reqwest::Url;
 use std::env;
+use serde_json::json;
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,7 +27,14 @@ fn main() {
     env_logger::init();
     log::info!("Starting Tauri application");
     tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![greet, create_event, get_event, list_events, create_database])
+    .invoke_handler(tauri::generate_handler![
+        greet,
+        create_event,
+        get_event,
+        list_events,
+        create_database,
+        start_replication 
+        ])
     .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -48,6 +56,10 @@ log::info!("Database URL: {}", db_url);
     match res {
         Ok(response) => {
             if response.status().is_success() {
+                // Create the design document after successfully creating the database
+                if let Err(e) = create_design_doc(&client, &db_url).await {
+                    return Err(format!("Database created, but failed to create design document: {}", e));
+                }
                 Ok(format!("Database '{}' created successfully", dbName))
             } else {
                 let error_text = response.text().await.unwrap_or("Unknown error".to_string());
@@ -168,5 +180,75 @@ async fn list_events() -> Result<Vec<Event>, String> {
         Ok(events)
     } else {
         Err(format!("Failed to fetch events: {}", res.status()))
+    }
+}
+
+async fn create_design_doc(client: &Client, db_url: &str) -> Result<(), String> {
+    let design_doc = serde_json::json!({
+        "_id": "_design/events",
+        "views": {
+            "all": {
+                "map": "function(doc) { if (doc.id && doc.title && doc.description && doc.date && doc.location) { emit(doc._id, doc); } }"
+            }
+        }
+    });
+
+    let res = client.put(&format!("{}/{}", db_url, "_design/events"))
+        .json(&design_doc)
+        .send()
+        .await;
+
+    match res {
+        Ok(response) => {
+            if response.status().is_success() {
+                Ok(())
+            } else {
+                let error_text = response.text().await.unwrap_or("Unknown error".to_string());
+                log::error!("Failed to create design document: {}", error_text);
+                Err(error_text)
+            }
+        },
+        Err(e) => {
+            log::error!("Request error: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+// await invoke('start_replication', { 
+//     sourceUrl: 'http://localhost:5984', 
+//     targetUrl: 'http://second-couchdb-instance:5984', 
+//     dbName: 'events' 
+//   });
+#[tauri::command]
+async fn start_replication(source_url: String, target_url: String, db_name: String) -> Result<String, String> {
+    let client = Client::new();
+    let replication_url = format!("{}_replicate", source_url.trim_end_matches('/'));
+
+    let replication_doc = json!({
+        "source": format!("{}/{}", source_url, db_name),
+        "target": format!("{}/{}", target_url, db_name),
+        "continuous": true
+    });
+
+    let res = client.post(&replication_url)
+        .json(&replication_doc)
+        .send()
+        .await;
+
+    match res {
+        Ok(response) => {
+            if response.status().is_success() {
+                Ok(format!("Replication started successfully for database '{}'", db_name))
+            } else {
+                let error_text = response.text().await.unwrap_or("Unknown error".to_string());
+                log::error!("Failed to start replication: {}", error_text);
+                Err(error_text)
+            }
+        },
+        Err(e) => {
+            log::error!("Request error: {}", e);
+            Err(e.to_string())
+        }
     }
 }
