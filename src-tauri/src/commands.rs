@@ -1,9 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 use reqwest::Client;
 use reqwest::Url;
-use serde_json::json;
-use std::env;
 use crate::event::Event;
+use cassandra_cpp::Cluster;
+use cassandra_cpp::AsRustType;
+use cassandra_cpp::LendingIterator;
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {
@@ -12,38 +13,17 @@ pub fn greet(name: &str) -> String {
 
 
 #[tauri::command]
-pub async fn create_database(dbName: String) -> Result<String, String> {
-    let client = Client::new();
-    let couchdb_url = env::var("COUCHDB_URL").unwrap_or("http://localhost:5984".to_string());
-    let db_url = format!("{}/{}", couchdb_url, dbName);
+pub async fn create_database(db_name: String) -> Result<String, String> {
+    let mut clusterdefault = Cluster::default();
+    let cluster = clusterdefault.set_contact_points("127.0.0.1").unwrap();
+    let session = cluster.connect().await.map_err(|e| e.to_string())?;
 
-    log::info!("CouchDB URL: {}", couchdb_url);
-log::info!("Database URL: {}", db_url);
-    log::info!("Creating CouchDB database at URL: {}", db_url);
-
-    let res = client.put(&db_url)
-        .send()
-        .await;
-
-    match res {
-        Ok(response) => {
-            if response.status().is_success() {
-                // Create the design document after successfully creating the database
-                if let Err(e) = create_design_doc(&client, &db_url).await {
-                    return Err(format!("Database created, but failed to create design document: {}", e));
-                }
-                Ok(format!("Database '{}' created successfully", dbName))
-            } else {
-                let error_text = response.text().await.unwrap_or("Unknown error".to_string());
-                log::error!("Failed to create database: {}", error_text);
-                Err(error_text)
-            }
-        },
-        Err(e) => {
-            log::error!("Request error: {}", e);
-            Err(e.to_string())
-        }
-    }
+    // Create keyspace if it doesn't exist
+    let create_keyspace = format!("CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = {{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 }};", db_name);
+    let create_keyspace_ref = create_keyspace.clone();
+    session.execute(&create_keyspace_ref).await.map_err(|e| e.to_string())?;
+    
+    Ok(format!("Keyspace '{}' created successfully", db_name))
 }
 
 pub fn create_client_with_referer(couchdb_url: &str) -> Client {
@@ -56,171 +36,69 @@ pub fn create_client_with_referer(couchdb_url: &str) -> Client {
 }
 
 #[tauri::command]
-pub async fn create_event(id: u64, title: String, description: String, date: String, location: String) -> Result<Event, String> {
+pub async fn create_event(id: String, title: String, description: String, date: String, location: String) -> Result<Event, String> {
     let event = Event { id, title: title.clone(), description: description.clone(), date: date.clone(), location: location.clone() };
-    let couchdb_url = env::var("COUCHDB_URL").unwrap_or("http://localhost:5984".to_string());
+    let mut clusterdefault = Cluster::default();
+    let cluster = clusterdefault.set_contact_points("127.0.0.1").unwrap();
+    let session = cluster.connect().await.map_err(|e| e.to_string())?; // Await the connect method
     let db_name = "events";
-    let db_url = format!("{}/{}", couchdb_url, db_name);
 
-    let client = create_client_with_referer(&couchdb_url);
-    let db_exists = client.head(&db_url).send().await.map_err(|e| e.to_string())?.status().is_success();
-    if !db_exists {
-        let _ = create_database(db_name.to_string()).await;
-    }
+    // Create table if it doesn't exist
+    let create_table = format!("CREATE TABLE IF NOT EXISTS {} (id UUID PRIMARY KEY, title text, description text, date text, location text);", db_name);
+    session.execute(&create_table).await.map_err(|e| e.to_string())?; // Await the execute method
 
-    // Create JSON payload
-    let payload = serde_json::json!({
-        "id": id,
-        "title": title,
-        "description": description,
-        "date": date,
-        "location": location
-    });
+    // Insert event into Cassandra
+    let insert_event = format!("INSERT INTO {} (id, title, description, date, location) VALUES (uuid(), '{}', '{}', '{}', '{}');", db_name, title, description, date, location);
+    session.execute(&insert_event).await.map_err(|e| e.to_string())?; // Await the execute method
 
-    let res = client.post(&db_url)
-        .header("Content-Type", "application/json")
-        .json(&payload)
-        .send()
-        .await;
-
-    match res {
-        Ok(response) => {
-            if response.status().is_success() {
-                Ok(event)
-            } else {
-                let error_text = response.text().await.unwrap_or("Unknown error".to_string());
-                log::error!("Failed to create event: {}", error_text);
-                Err(error_text)
-            }
-        },
-        Err(e) => {
-            log::error!("Request error: {}", e);
-            Err(e.to_string())
-        }
-    }
+    Ok(event)
 }
 #[tauri::command]
 pub async fn get_event(id: u64) -> Result<Option<Event>, String> {
-    let client = Client::new();
-    let couchdb_url = env::var("COUCHDB_URL").unwrap_or("http://localhost:5984/events".to_string());
+    let mut clusterdefault = Cluster::default();
+    let cluster = clusterdefault.set_contact_points("127.0.0.1").unwrap();
+    let session = cluster.connect().await.map_err(|e| e.to_string())?; // Await the connect method
+    let db_name = "events";
 
-    let res = client.get(&format!("{}/{}", couchdb_url, id))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let query = format!("SELECT * FROM {} WHERE id = {};", db_name, id);
+    let result = session.execute(&query).await.map_err(|e| e.to_string())?; // Await the execute method
 
-    if res.status().is_success() {
-        let event = res.json::<Event>().await.map_err(|e| e.to_string())?;
+    if let Some(row) = result.first_row() {
+        let event = Event {
+            id: row.get_by_name::<String>("id".to_string()).unwrap(),
+            title: row.get_by_name::<String>("title".to_string()).unwrap(),
+            description: row.get_by_name::<String>("description".to_string()).unwrap(),
+            date: row.get_by_name::<String>("date".to_string()).unwrap(),
+            location: row.get_by_name::<String>("location".to_string()).unwrap(),
+        };
         Ok(Some(event))
-    } else if res.status().as_u16() == 404 {
-        Ok(None)
     } else {
-        Err(res.text().await.unwrap_or("Unknown error".to_string()))
+        Ok(None)
     }
 }
 
 #[tauri::command]
 pub async fn list_events() -> Result<Vec<Event>, String> {
-    let couchdb_url = env::var("COUCHDB_URL").unwrap_or("http://localhost:5984".to_string());
+    let mut clusterdefault = Cluster::default();
+    let cluster = clusterdefault.set_contact_points("127.0.0.1").unwrap();
+    let session = cluster.connect().await.map_err(|e| e.to_string())?;
     let db_name = "events";
-    let view_url = format!("{}/{}/_design/events/_view/all", couchdb_url, db_name);
 
-    let client = create_client_with_referer(&couchdb_url);
-    
-    let res = client.get(&view_url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let query = format!("SELECT * FROM {};", db_name);
+    let result = session.execute(&query).await.map_err(|e| e.to_string())?;
 
-    if res.status().is_success() {
-        let body: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-        let rows = body["rows"].as_array().ok_or("Invalid response format")?;
-        
-        let events: Vec<Event> = rows.iter()
-            .filter_map(|row| {
-                let doc = row["value"].as_object()?;
-                Some(Event {
-                    id: doc["id"].as_u64()?,
-                    title: doc["title"].as_str()?.to_string(),
-                    description: doc["description"].as_str()?.to_string(),
-                    date: doc["date"].as_str()?.to_string(),
-                    location: doc["location"].as_str()?.to_string(),
-                })
-            })
-            .collect();
-
-        Ok(events)
-    } else {
-        Err(format!("Failed to fetch events: {}", res.status()))
+    let mut events = Vec::new();
+    let mut iter = result.iter();
+    while let Some(row) = iter.next() {
+        let event = Event {
+            id: row.get_column_by_name::<String>("id".to_string()).unwrap().to_string(),
+            title: row.get_column_by_name::<String>("title".to_string()).unwrap().to_string(),
+            description: row.get_column_by_name::<String>("description".to_string()).unwrap().to_string(),
+            date: row.get_column_by_name::<String>("date".to_string()).unwrap().to_string(),
+            location: row.get_column_by_name::<String>("location".to_string()).unwrap().to_string(),
+        };
+        events.push(event);
     }
-}
 
-pub async fn create_design_doc(client: &Client, db_url: &str) -> Result<(), String> {
-    let design_doc = serde_json::json!({
-        "_id": "_design/events",
-        "views": {
-            "all": {
-                "map": "function(doc) { if (doc.id && doc.title && doc.description && doc.date && doc.location) { emit(doc._id, doc); } }"
-            }
-        }
-    });
-
-    let res = client.put(&format!("{}/{}", db_url, "_design/events"))
-        .json(&design_doc)
-        .send()
-        .await;
-
-    match res {
-        Ok(response) => {
-            if response.status().is_success() {
-                Ok(())
-            } else {
-                let error_text = response.text().await.unwrap_or("Unknown error".to_string());
-                log::error!("Failed to create design document: {}", error_text);
-                Err(error_text)
-            }
-        },
-        Err(e) => {
-            log::error!("Request error: {}", e);
-            Err(e.to_string())
-        }
-    }
-}
-
-// await invoke('start_replication', { 
-//     sourceUrl: 'http://localhost:5984', 
-//     targetUrl: 'http://second-couchdb-instance:5984', 
-//     dbName: 'events' 
-//   });
-#[tauri::command]
-pub async fn start_replication(source_url: String, target_url: String, db_name: String) -> Result<String, String> {
-    let client = Client::new();
-    let replication_url = format!("{}_replicate", source_url.trim_end_matches('/'));
-
-    let replication_doc = json!({
-        "source": format!("{}/{}", source_url, db_name),
-        "target": format!("{}/{}", target_url, db_name),
-        "continuous": true
-    });
-
-    let res = client.post(&replication_url)
-        .json(&replication_doc)
-        .send()
-        .await;
-
-    match res {
-        Ok(response) => {
-            if response.status().is_success() {
-                Ok(format!("Replication started successfully for database '{}'", db_name))
-            } else {
-                let error_text = response.text().await.unwrap_or("Unknown error".to_string());
-                log::error!("Failed to start replication: {}", error_text);
-                Err(error_text)
-            }
-        },
-        Err(e) => {
-            log::error!("Request error: {}", e);
-            Err(e.to_string())
-        }
-    }
+    Ok(events)
 }

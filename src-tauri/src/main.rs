@@ -5,7 +5,6 @@
 use std::env;
 mod event;
 mod commands;
-use commands::*;
 
 
 fn main() {
@@ -18,7 +17,6 @@ fn main() {
         commands::get_event,
         commands::list_events,
         commands::create_database,
-        commands::start_replication 
         ])
     .run(tauri::generate_context!())
         .expect("error while running tauri application");

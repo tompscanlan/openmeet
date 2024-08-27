@@ -1,77 +1,96 @@
-version: '3'
-services:
-  couchdb1:
-    container_name: couchdb1
-    image: couchdb:3
-    command: >
-      bash -c "
-        while ! curl -s http://global:butterball@localhost:5984; do
-          sleep 1;
-        done;
-        curl -X PUT http://global:butterball@localhost:5984/_users;
-        curl -X PUT http://global:butterball@localhost:5984/_replicator;
-        curl -X PUT http://global:butterball@localhost:5984/_global_changes;
-        exec /docker-entrypoint.sh couchdb
-      "
-    environment:
-      - COUCHDB_USER=global
-      - COUCHDB_PASSWORD=butterball
-      - COUCHDB_NODENAME=couchdb1
-      - COUCHDB_CLUSTER_PORT_NUMBER=9100
-      - COUCHDB_CREATE_DATABASES=yes
-    ports:
-      - '35984:5984'
-      - '34369:4369'
-      - '39100:9100'
-    volumes:
-      - couchdb1_data:/opt/couchdb/data
-    networks:
-      - couchdb_network
-
-  couchdb2:
-    container_name: couchdb2
-    image: couchdb:3
-    environment:
-      - COUCHDB_USER=global
-      - COUCHDB_PASSWORD=butterball
-      - COUCHDB_NODENAME=couchdb2
-      - COUCHDB_CLUSTER_PORT_NUMBER=19100
-      - COUCHDB_CREATE_DATABASES=no
-    ports:
-      - '15984:5984'
-      - '14369:4369'
-      - '19100:9100'
-    volumes:
-      - couchdb2_data:/opt/couchdb/data
-    networks:
-      - couchdb_network
-
-  couchdb3:
-    container_name: couchdb3
-    image: couchdb:3
-    environment:
-      - COUCHDB_USER=global
-      - COUCHDB_PASSWORD=butterball
-      - COUCHDB_NODENAME=couchdb3
-      - COUCHDB_CLUSTER_PORT_NUMBER=29100
-      - COUCHDB_CREATE_DATABASES=no
-    ports:
-      - '25984:5984'
-      - '24369:4369'
-      - '29100:9100'
-    volumes:
-      - couchdb3_data:/opt/couchdb/data
-    networks:
-      - couchdb_network
-
-volumes:
-  couchdb1_data:
-    driver: local
-  couchdb2_data:
-    driver: local
-  couchdb3_data:
-    driver: local
+version: "3.3"
 
 networks:
-  couchdb_network:
+  cassandra-net:
     driver: bridge
+
+services:
+
+  cassandra-1:
+    image: "cassandra:latest"  # cassandra:4.1.3
+    container_name: "cassandra-1"
+    ports:
+      - 7000:7000
+      - 9042:9042
+    networks:
+      - cassandra-net
+    environment:
+      - CASSANDRA_START_RPC=true       # default
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0  # default
+      - CASSANDRA_LISTEN_ADDRESS=auto  # default, use IP addr of container # = CASSANDRA_BROADCAST_ADDRESS
+      - CASSANDRA_CLUSTER_NAME=my-cluster
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_DC=my-datacenter-1
+    volumes:
+      - cassandra-node-1:/var/lib/cassandra:rw
+    restart:
+      on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status"]
+      interval: 2m
+      start_period: 2m
+      timeout: 10s
+      retries: 3
+
+  cassandra-2:
+    image: "cassandra:latest"  # cassandra:4.1.3
+    container_name: "cassandra-2"
+    ports:
+      - 9043:9042
+    networks:
+      - cassandra-net
+    environment:
+      - CASSANDRA_START_RPC=true       # default
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0  # default
+      - CASSANDRA_LISTEN_ADDRESS=auto  # default, use IP addr of container # = CASSANDRA_BROADCAST_ADDRESS
+      - CASSANDRA_CLUSTER_NAME=my-cluster
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_DC=my-datacenter-1
+      - CASSANDRA_SEEDS=cassandra-1
+    depends_on:
+      cassandra-1:
+        condition: service_healthy
+    volumes:
+      - cassandra-node-2:/var/lib/cassandra:rw
+    restart:
+      on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status"]
+      interval: 2m
+      start_period: 2m
+      timeout: 10s
+      retries: 3
+
+  cassandra-3:
+    image: "cassandra:latest"  # cassandra:4.1.3
+    container_name: "cassandra-3"
+    ports:
+      - 9044:9042
+    networks:
+      - cassandra-net
+    environment:
+      - CASSANDRA_START_RPC=true       # default
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0  # default
+      - CASSANDRA_LISTEN_ADDRESS=auto  # default, use IP addr of container # = CASSANDRA_BROADCAST_ADDRESS
+      - CASSANDRA_CLUSTER_NAME=my-cluster
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_DC=my-datacenter-1
+      - CASSANDRA_SEEDS=cassandra-1
+    depends_on:
+      cassandra-2:
+        condition: service_healthy
+    volumes:
+      - cassandra-node-3:/var/lib/cassandra:rw
+    restart:
+      on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status"]
+      interval: 2m
+      start_period: 2m
+      timeout: 10s
+      retries: 3
+
+volumes:
+  cassandra-node-1:
+  cassandra-node-2:
+  cassandra-node-3:
