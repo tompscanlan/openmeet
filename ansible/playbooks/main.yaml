@@ -1,0 +1,11 @@
+---
+
+- name: Deploy Cassandra to Lab
+  hosts: cassandra
+  
+  roles:
+    - role: community.cassandra.cassandra_repository
+      vars:
+        cassandra_version: "41x"
+    - role: community.cassandra.cassandra_linux
+    - role: community.cassandra.cassandra_install

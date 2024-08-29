@@ -9,19 +9,19 @@ const location = ref('');
 const events = ref([]);
 const errorMessage = ref('');
 
-const createDatabase = async () => {
+const createKeyspace = async () => {
   try {
-    await invoke('create_database', { dbName: 'events' });
+    await invoke('create_keyspace', { keyspaceName: 'events' });
     errorMessage.value = '';
-  } catch (error) {
-    errorMessage.value = error.toString();
+  } catch (error: unknown) {
+    errorMessage.value = (error as Error).toString();
   }
 };
 
 const createEvent = async () => {
   try {
-    const id = Date.now(); // This is now a valid u64
-    await invoke('create_event', { id: Date.now(), title: title.value, description: description.value, date: date.value, location: location.value });
+    const id: string = Date.now().toString();
+    await invoke('create_event', { id: id, title: title.value, description: description.value, date: date.value, location: location.value });
     loadEvents();
     errorMessage.value = '';
   } catch (error) {
@@ -62,7 +62,7 @@ onMounted(async () => {
       <button type="submit">Create Event</button>
     </form>
 
-    <button @click="createDatabase">Create Database</button>
+    <button @click="createKeyspace">Create Keyspace</button>
 
     <div v-if="errorMessage" class="error-message">
          {{ errorMessage }}

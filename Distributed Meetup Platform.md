@@ -10,11 +10,11 @@ This approach promotes data ownership, privacy, and community control while stil
 There's growing interest in decentralized and self-hosted alternatives to big tech platforms. The success of platforms like Mastodon demonstrates a market for distributed social technologies. The events industry remains substantial, indicating potential for adoption.
 
 ## Technical Feasibility
-This could be implemented as a server application written in a language like Rust, Go, or Node.js for efficiency and ease of deployment. It would use CouchDB for data replication between instances. A REST API would allow for custom frontends, with a default web interface provided.
+This could be implemented as a server application written in a language like Rust, Go, or Node.js for efficiency and ease of deployment. It would use Cassandra for data replication between instances. A REST API would allow for custom frontends, with a default web interface provided.
 
 Key components:
 1. Server application for hosting events and user data
-2. CouchDB instances for syncing between nodes
+2. Cassandra instances for syncing between nodes
 3. Federation protocol for instance communication
 4. Web interface for users to interact with the platform
 
@@ -45,13 +45,13 @@ Key components:
 ## Architecture Outline
 
 ### 1. Server Application
-- **Language**: Rust, Go, or Node.js
+- **Language**: Rust
 - **Responsibilities**: 
   - Hosting events and user data
   - Handling API requests
   - Managing instance synchronization
 
-### 2. CouchDB Instances
+### 2. Cassandra Instances
 - **Responsibilities**:
   - Storing and replicating data
   - Handling conflict resolution
@@ -63,8 +63,8 @@ Key components:
   - Event and user data synchronization
   - Discovery mechanisms for events across the network
 
-### 4. Web Interface
-- **Technologies**: React, Vue.js, or Angular
+### 4. Web Interface / Native App
+- **Technologies**: Vue.js, tauri in rust
 - **Responsibilities**:
   - User interaction with the platform
   - Event creation and management
@@ -83,13 +83,39 @@ Key components:
   - Role-based access control
 
 ### 7. Monitoring and Logging
-- **Technologies**: Prometheus, Grafana, ELK Stack
+- **Technologies**: Prometheus, Grafana
 - **Responsibilities**:
   - System health monitoring
   - Logging and error tracking
 
 ### 8. Instance Management
+- **Technologies**: Ansible, Docker, Kubernetes
 - **Responsibilities**:
   - Tools for easy instance setup and maintenance
   - Configuration management
   - Instance discovery and registration
+
+
+## Data Model
+### Queries we'd like to make
+
+1. Create user
+1. update user
+1. delete user
+1. get user
+1. login
+1. logout
+1. register user
+1. create event
+1. update event
+1. delete event
+1. Get all events for a given user
+2. Get all events for a given user and a given time frame
+1. get all events near me in a time frame
+1. get event
+1. comment on event
+1.get all event comments
+1. get all user comments
+
+
+

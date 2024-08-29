@@ -1,0 +1,12 @@
+---
+all:
+  children:
+    cassandra:
+      hosts:
+        cassandra01:
+          ansible_host: 192.168.8.102
+          ansible_user: tscanlan
+          ansible_become: yes
+          ansible_become_user: root
+          ansible_become_pass: "{{ lookup('env', 'SUDO_PASSWORD') }}"
+      
