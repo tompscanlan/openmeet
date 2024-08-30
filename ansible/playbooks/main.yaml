@@ -1,11 +1,53 @@
 ---
-
 - name: Deploy Cassandra to Lab
   hosts: cassandra
   
-  roles:
-    - role: community.cassandra.cassandra_repository
-      vars:
-        cassandra_version: "41x"
-    - role: community.cassandra.cassandra_linux
-    - role: community.cassandra.cassandra_install
+  # roles:
+  #   - role: community.cassandra.cassandra_repository
+  #     vars:
+  #       cassandra_version: "41x"
+  #   - role: community.cassandra.cassandra_linux
+  #   - role: community.cassandra.cassandra_install
+
+  tasks:
+    - name: install certbot
+      apt:
+        name: certbot
+        state: present
+        update_cache: true
+
+    - name: install python3-certbot-dns-route53
+      apt:
+        name: python3-certbot-dns-route53
+        state: present
+        update_cache: false
+
+    - name: get certificate
+      command: certbot certonly -n --dns-route53 -d cassandra1.int.butterhead.net
+
+    - name: Copy cassandra.yaml to /etc/cassandra/cassandra.yaml
+      copy:
+        src: ../../database/cassandra.yaml
+        dest: /etc/cassandra/cassandra.yaml
+        mode: '0644'
+        owner: root
+        group: cassandra
+
+    - name: Ensure Cassandra directories have correct permissions
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: cassandra
+        group: cassandra
+        mode: '0755'
+      loop:
+        - /var/lib/cassandra
+        - /var/lib/cassandra/commitlog
+        - /var/lib/cassandra/data
+        - /var/log/cassandra
+
+    - name: restart cassandra
+      systemd:
+        name: cassandra
+        state: restarted
+        enabled: true
