@@ -1,93 +1,118 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { invoke } from '@tauri-apps/api/tauri';
+import LoginPage from './pages/Login.vue';
+import AuthenticatedPage from './pages/AuthenticatedPage.vue';
+import UnauthenticatedPage from './pages/UnauthenticatedPage.vue';
+import LogoutPage from './pages/Logout.vue';
+import { computed } from 'vue';
 
-const title = ref('');
-const description = ref('');
-const date = ref('');
-const location = ref('');
-const events = ref([]);
-const errorMessage = ref('');
+const isAuthenticated = ref(false);
+const currentPage = ref('unauthenticated');
 
-const createKeyspace = async () => {
+let routes = {
+  '/': UnauthenticatedPage ,
+  '/login': LoginPage ,
+  '/authenticated': AuthenticatedPage ,
+  '/logout': LogoutPage ,
+}
+
+const currentPath = ref(window.location.hash)
+
+window.addEventListener('hashchange', () => {
+  currentPath.value = window.location.hash
+})
+
+const currentView = computed(() => {
+  let newpath:string = currentPath.value.slice(1) || '/'
+  return routes[newpath as keyof typeof routes] || routes['/']
+})
+
+const login = async (username: string, password: string) => {
   try {
-    await invoke('create_keyspace', { keyspaceName: 'events' });
-    errorMessage.value = '';
-  } catch (error: unknown) {
-    errorMessage.value = (error as Error).toString();
+    const result = await invoke('login_user', { username, password });
+    if (result === true) {
+      isAuthenticated.value = true;
+      currentPage.value = 'authenticated';
+    } else {
+      throw new Error('Invalid credentials');
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    alert('Login failed. Please check your credentials.');
   }
 };
 
-const createEvent = async () => {
+const logout = async () => {
   try {
-    const id: string = Date.now().toString();
-    await invoke('create_event', { id: id, title: title.value, description: description.value, date: date.value, location: location.value });
-    loadEvents();
-    errorMessage.value = '';
+    await invoke('logout_user');
+    isAuthenticated.value = false;
+    currentPage.value = 'logout';
   } catch (error) {
-    errorMessage.value = error.toString();  }
+    console.error('Logout error:', error);
+  }
 };
 
-const loadEvents = async () => {
-  try {
-    const result = await invoke('list_events');
-    console.log('Raw result:', result);
-    if (Array.isArray(result)) {
-      events.value = result;
-      console.log('Loaded events:', events.value);
-    } else {
-      throw new Error('Expected an array of events');
-    }
-  } catch (error) {
-    console.error('Error loading events:', error);
-    errorMessage.value = `Error loading events: ${error}`;
-    events.value = [];
+const navigateTo = (page: string) => {
+  if (page === 'authenticated' && !isAuthenticated.value) {
+    alert('Please log in first.');
+    currentPage.value = 'login';
+  } else {
+    currentPage.value = page;
   }
 };
 
 onMounted(async () => {
-  await loadEvents();
+  try {
+    const authStatus = await invoke('check_auth_status');
+    isAuthenticated.value = authStatus === true;
+  } catch (error) {
+    console.error('Auth check error:', error);
+    isAuthenticated.value = false;
+  }
 });
 </script>
 
 <template>
   <div class="container">
     <h1>OpenMeet</h1>
+    <nav>
+      <a href="#/">Home</a>
+      <a href="#/login" v-if="!isAuthenticated">Login</a>
+      <a href="#/logout" v-if="isAuthenticated">Logout</a>
+      <a href="#/authenticated" v-if="isAuthenticated">Authenticated Page</a>
+      <a href="#/unauthenticated" >unauth page</a>
 
-    <form @submit.prevent="createEvent">
-      <input v-model="title" type="text" placeholder="Title" required />
-      <input v-model="description" type="text" placeholder="Description" required />
-      <input v-model="date" type="date" required />
-      <input v-model="location" type="text" placeholder="Location" required />
-      <button type="submit">Create Event</button>
-    </form>
+    </nav>
 
-    <button @click="createKeyspace">Create Keyspace</button>
-
-    <div v-if="errorMessage" class="error-message">
-         {{ errorMessage }}
-       </div>
-
-       <div v-if="events.length === 0">No events found.</div>
-<ul v-else>
-  <li v-for="event in events" :key="event.id">
-    <strong>{{ event.title }}</strong> - {{ event.date }} at {{ event.location }}
-    <p>{{ event.description }}</p>
-  </li>
-</ul>
+    <component :is="currentView" />
   </div>
 </template>
-   <style scoped>
-   .container {
-     margin: 0;
-     padding-top: 10vh;
-     display: flex;
-     flex-direction: column;
-     justify-content: center;
-     text-align: center;
-   }
 
-   form {
+<style scoped>
+.container {
+  margin: 0;
+  padding-top: 10vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+nav {
+  margin-bottom: 20px;
+  margin-left: 1pt;
+  margin-right: 1pt;
+}
+
+nav a {
+  margin: 1pt;
+}
+
+nav button {
+  margin: 0 5px;
+}
+  form {
      display: flex;
      flex-direction: column;
      gap: 1em;
