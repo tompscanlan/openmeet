@@ -340,6 +340,7 @@ mod tests {
         // assert that the count of events is 0 for that creator_id
         let events_for_creator = list_events_by_creator_id(creator_id).await.unwrap();
         assert_eq!(events_for_creator.len(), 0);
+        assert!(events_for_creator.is_empty());
 
 
     }
