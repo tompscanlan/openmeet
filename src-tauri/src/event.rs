@@ -120,12 +120,13 @@ pub async fn get_event(creator_id: Uuid, start_time: i64, event_id: Uuid) -> Res
     // Prepare the query to select the event by creator_id, start_time, and event_id
     let query = format!("SELECT * FROM {} WHERE creator_id = ? AND start_time = ? AND event_id = ?;", db_name);
     let mut statement = session.statement(query.clone());
-    statement.bind(0, creator_id).map_err(|e| e.to_string())?;
-    statement.bind(1, start_time).map_err(|e| e.to_string())?;
-    statement.bind(2, event_id).map_err(|e| e.to_string())?;
+    
+    statement.bind_by_name("creator_id", creator_id)?;
+    statement.bind_by_name("start_time", start_time)?;
+    statement.bind_by_name("event_id", event_id)?;
 
     // Execute the query
-    let result = session.execute(query).await.map_err(|e| e.to_string())?;
+    let result = statement.execute().await.map_err(|e| e.to_string())?;
 
     // Check if we have a result and map it to an Event
     if let Some(row) = result.first_row() {
@@ -211,17 +212,14 @@ mod tests {
 
     // disable test
     #[tokio::test]
-    #[ignore]
     async fn test_list_events() {
+        // get currrent, possbly empty list
         let events = list_events().await.unwrap();
-        assert_eq!(events.len(), 0);
-        println!("{:?}", events);
+        let events_count = events.len();
 
         let uuid_gen = UuidGen::default();
         let creator_id = uuid_gen.gen_time();
-
         let timestamp_gen = TimestampGen::gen_monotonic_new();
-        println!("{:?}", timestamp_gen);
 
         // insert an event
         let event = create_event(
@@ -234,9 +232,9 @@ mod tests {
            0.0,
            "address".to_string()).await.unwrap();
 
+        // at least one more record now
         let events = list_events().await.unwrap();
-        assert_eq!(events.len(), 1);
-        println!("{:?}", events);
+        assert!(events.len() >= events_count + 1);
     }
 
     #[tokio::test]
@@ -249,7 +247,6 @@ mod tests {
     }
      
     #[tokio::test]
-    #[ignore]
     async fn test_create_event() {
         let uuid_gen = UuidGen::default();
         let creator_id = uuid_gen.gen_time();
@@ -268,7 +265,6 @@ mod tests {
         println!("looking up creator_id: {:?}, start_time: {:?}, event_id: {:?}", creator_id, event.start_time, event.event_id);
         // look it back up
         let event = get_event(creator_id, event.start_time, event.event_id).await.unwrap();
-        println!("{:?}", event);
 
         assert_eq!(event.unwrap().title, "title is good");
         
