@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 
-use crate::commands::init_cluster;
+use crate::init_cluster;
 use cassandra_cpp::BindRustType;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 // CREATE TABLE users (
@@ -30,7 +29,7 @@ pub struct User {
 #[tauri::command]
 pub async fn create_user(user: User) -> Result<User, String> {
     println!("in create {:?}", user.user_id);
-    let mut cluster = init_cluster().await;
+    let mut cluster = init_cluster().await?;
     let session = cluster.connect().await.map_err(|e| e.to_string())?; // Await the connect method
 
     let query = "INSERT INTO openmeet.users (user_id, username, email, password_hash, created_at, updated_at, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)";
