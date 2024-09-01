@@ -8,17 +8,23 @@ WITH replication = {
 -- Use the openmeet keyspace
 USE openmeet;
 
-
 -- Users table
-CREATE TABLE users (
-  user_id UUID PRIMARY KEY,
+CREATE TABLE openmeet.users (
+  user_id UUID,
   username TEXT,
   email TEXT,
   password_hash TEXT,
   created_at TIMESTAMP,
   updated_at TIMESTAMP,
-  last_login TIMESTAMP
+  last_login TIMESTAMP,
+  PRIMARY KEY (user_id)
 );
+CREATE TABLE openmeet.email_index (
+  email TEXT PRIMARY KEY,
+  user_id UUID
+);
+CREATE INDEX ON openmeet.users (email);
+
 
 -- Events table
 CREATE TABLE events (
