@@ -1,20 +1,44 @@
-# Tauri + Vue + TypeScript
+# OpenMeet
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+This project is intended to be a lot like meetup.com but more for groups of people who live near each other, people you run into often, or people you'd like to know better.  You can take this project and host your own meetup.com focused on your local community, or be the parent who can can organize all the kids at the playground to a regular event.  Do these things without losing control of your personal data.
 
-## Recommended IDE Setup
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+I want every user to be able to make sure their data can leave with them. I want communities to win, not facebook. 
+I want organizing a meetup to be as easy as possible, and that means free. 
 
-## Type Support For `.vue` Imports in TS
+## How to get started?
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+1. Clone the repository
+2. Deploy the CassandraDB, This is where your data will live.  You can choose to federate with others and break off onto your own again later
+3. Deploy the API and Front end services somwhere
+4. point your dns at it
+5. Invite your friends to the url
+6. If they sign up with you, their data never leaves your cluster
+7. If they sign up at our site, We'll keep a thin layer of profile data so that they can pull over their own data into your instance.
+8. if your events move from the public site to your own,  
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+## Features
 
+1. Import/export your data from a private instance, to the public instance or to another private instance
+2. Find events happening nearby, at a specific date, or look them up by host.
+
+## MVP
+
+* DB, API, and Frontend all in docker containers
+* Can CRUD users, and basic events
+* Can federate with other instances
+
+
+
+## What does it mean to federate?
+
+
+# initial development below here, ignore for now
+
+## Tauri App
+
+Initially going tauri, but need a web endpoint, so switching to web services first then circle back to tauri maybe
 
 # installing couchdb
 
