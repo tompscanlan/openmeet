@@ -2,8 +2,10 @@
   <div class="container">
     <nav>
       <NuxtLink to="/">Home</NuxtLink>
-      <!-- <NuxtLink to="/login">Login</NuxtLink> -->
-      <NuxtLink to="/register">Register</NuxtLink>
+      <NuxtLink to="/manageUsers">Manage Users</NuxtLink>
+      
+      <NuxtLink to="/login">Login</NuxtLink>
+      <NuxtLink to="/logout">Logout</NuxtLink>
     </nav>
     <NuxtPage />
  

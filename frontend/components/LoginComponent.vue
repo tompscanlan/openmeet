@@ -22,7 +22,6 @@ const router = useRouter()
 
 const handleLogin = async () => {
   try {
-    console.log("login user", email.value, password.value)
     const response = await fetch('http://localhost:8000/login', {
       method: 'POST',
       headers: {
@@ -40,7 +39,6 @@ const handleLogin = async () => {
       throw new Error(data.message || 'Login failed')
     }
 
-    console.log('data returned from /login', data)
     if (data.token) {
       localStorage.setItem('token', data.token)
       router.push('/')

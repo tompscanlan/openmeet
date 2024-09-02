@@ -24,7 +24,6 @@ const router = useRouter()
 
 const handleRegister = async () => {
   try {
-    console.log("register user", username.value, email.value, password.value)
     const response = await fetch('http://localhost:8000/register', {
       method: 'POST',
       headers: {
