@@ -1,8 +1,6 @@
 <template>
     <div class="container">
 
-        <LoginComponent />
-
     <h1>Welcome to OpenMeet</h1>
     <p>Organize local meetups easily while keeping your data private.</p>
     

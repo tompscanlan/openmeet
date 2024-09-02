@@ -1,13 +1,14 @@
 <template>
-  <div class="login">
-    <h2>Login</h2>
-    <form @submit.prevent="handleLogin">
+  <div class="register">
+    <h2>Register</h2>
+    <form @submit.prevent="handleRegister">
+      <input type="text" v-model="username" placeholder="Username" required />
       <input type="email" v-model="email" placeholder="Email" required />
       <input type="password" v-model="password" placeholder="Password" required />
-      <button type="submit">Login</button>
+      <button type="submit">Register</button>
     </form>
     <p v-if="error" class="error">{{ error }}</p>
-    <NuxtLink to="/register">Register</NuxtLink>
+    <NuxtLink to="/login">Login</NuxtLink>
   </div>
 </template>
 
@@ -15,20 +16,22 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+const username = ref('')
 const email = ref('')
 const password = ref('')
 const error = ref('')
 const router = useRouter()
 
-const handleLogin = async () => {
+const handleRegister = async () => {
   try {
-    console.log("login user", email.value, password.value)
-    const response = await fetch('http://localhost:8000/login', {
+    console.log("register user", username.value, email.value, password.value)
+    const response = await fetch('http://localhost:8000/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        username: username.value,
         email: email.value,
         password: password.value
       })
@@ -37,34 +40,38 @@ const handleLogin = async () => {
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.message || 'Login failed')
+      throw new Error(data.message || 'Registration failed')
     }
 
-    console.log('data returned from /login', data)
     if (data.token) {
       localStorage.setItem('token', data.token)
-      router.push('/')
-    } else {
-      throw new Error('No token received')
     }
+    router.push('/login')
   } catch (err) {
-    console.error('Login failed', err)
-    error.value = err.message + error.value
+    console.error('Registration failed', err)
+    error.value = err.message
   }
 }
 </script>
 
 <style scoped>
-.login {
+.register {
   max-width: 300px;
   margin: 0 auto;
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
 }
 
 input {
   display: block;
   width: 100%;
   margin-bottom: 10px;
-  padding: 5px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 
 button {
@@ -73,11 +80,30 @@ button {
   background-color: #4CAF50;
   color: white;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
+  font-size: 16px;
+}
+
+button:hover {
+  background-color: #45a049;
 }
 
 .error {
   color: red;
   margin-top: 10px;
+  text-align: center;
+}
+
+a {
+  display: block;
+  text-align: center;
+  margin-top: 15px;
+  color: #4CAF50;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 </style>

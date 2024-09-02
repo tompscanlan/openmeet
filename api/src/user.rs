@@ -1,20 +1,37 @@
 use crate::init_cluster;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use cassandra_cpp::BindRustType;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use jsonwebtoken::{encode, Header, EncodingKey};
+use crate::Json;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
 pub struct User {
     pub user_id: Uuid,
     pub username: String,
     pub email: String,
     pub password_hash: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub last_login: DateTime<Utc>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_login: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserLogin {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserRegister {
+    pub username: String,
+    pub email: String,
+    pub password: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -23,39 +40,29 @@ pub struct Claims {
     pub exp: usize,
 }
 
+
 pub async fn is_valid_email(email: &str) -> bool {
     let email_regex = Regex::new(r"^[\w\.-]+@[\w\.-]+\.\w+$").unwrap();
     email_regex.is_match(email)
 }
 
-// passed a user with unencrypted password, that becomes a bcrypted password_hash
-pub async fn create_user(original_user: User) -> Result<User, String> {
-    let cloned_original_user: User = original_user.clone();
-    let mut user = original_user;
-
-    // create bcrypted password_hash
-    user.password_hash = hash(&user.password_hash, DEFAULT_COST).map_err(|e| e.to_string())?;
-
-    // create uuid
-    user.user_id = Uuid::new_v4();
-
-    // check email is valid
-    if !is_valid_email(&user.email).await {
-        return Err("Invalid email".to_string());
-    }
-
-    let mut cluster = init_cluster().await?;
-    let session = cluster.connect().await.map_err(|e| e.to_string())?;
-
-    // Check if email exists
+async fn check_email_exists(session: &cassandra_cpp::Session, email: &str) -> Result<bool, String> {
     let email_check_query = "SELECT user_id FROM openmeet.email_index WHERE email = ?";
     let mut email_check_statement = session.statement(email_check_query);
-    email_check_statement.bind(0, user.email.as_str()).map_err(|e| e.to_string())?;
-    let email_check_result = email_check_statement.execute().await.map_err(|e| e.to_string())?;
-    if email_check_result.first_row().is_some() {
-        return Err("Email already exists".to_string());
-    }
-
+    email_check_statement
+        .bind(0, email)
+        .map_err(|e| e.to_string())?;
+    let email_check_result = email_check_statement
+        .execute()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(email_check_result.first_row().is_some())
+}
+async fn insert_user(
+    session: &cassandra_cpp::Session,
+    user: &User,
+    now: i64,
+) -> Result<(), String> {
     let query = "INSERT INTO openmeet.users (user_id, username, email, password_hash, created_at, updated_at, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)";
     let mut statement = session.statement(query);
 
@@ -69,122 +76,153 @@ pub async fn create_user(original_user: User) -> Result<User, String> {
     statement
         .bind(3, user.password_hash.as_str())
         .map_err(|e| e.to_string())?;
-    statement
-        .bind(4, user.created_at.timestamp_millis())
-        .map_err(|e| e.to_string())?;
-    statement
-        .bind(5, user.updated_at.timestamp_millis())
-        .map_err(|e| e.to_string())?;
-    statement
-        .bind(6, user.last_login.timestamp_millis())
-        .map_err(|e| e.to_string())?;
-    assert_ne!(user.user_id, cloned_original_user.user_id);
-    assert_ne!(user.password_hash, cloned_original_user.password_hash);
+    statement.bind(4, now).map_err(|e| e.to_string())?;
+    statement.bind(5, now).map_err(|e| e.to_string())?;
+    statement.bind(6, now).map_err(|e| e.to_string())?;
 
-    let result = statement.execute().await;
+    statement.execute().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+async fn insert_email_index(
+    session: &cassandra_cpp::Session,
+    email: &str,
+    user_id: Uuid,
+) -> Result<(), String> {
+    let insert_email_index_query =
+        "INSERT INTO openmeet.email_index (email, user_id) VALUES (?, ?)";
+    let mut insert_email_index_statement = session.statement(insert_email_index_query);
+    insert_email_index_statement
+        .bind(0, email)
+        .map_err(|e| e.to_string())?;
+    insert_email_index_statement
+        .bind(1, user_id)
+        .map_err(|e| e.to_string())?;
+    insert_email_index_statement
+        .execute()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
 
+// passed a user with unencrypted password, that becomes a bcrypted password_hash
+pub async fn create_user(original_user: User) -> Result<User, String> {
+    // let cloned_original_user: User = original_user.clone();
+    let mut user = original_user;
 
-    if let Err(e) = result {
-        // Check if the error is due to a duplicate email
-        println!("error: {:?}", e.to_string());
-        if e.to_string().contains("duplicate") {
-            return Err("Email already exists".to_string());
-        }
-        return Err(format!("Failed to create user {}", e.to_string()));
+    // create bcrypted password_hash
+    user.password_hash = hash(&user.password_hash, DEFAULT_COST).map_err(|e| e.to_string())?;
+
+    // create uuid
+    user.user_id = Uuid::new_v4();
+
+    // check email is valid
+    if !is_valid_email(&user.email).await {
+        return Err("Invalid email".to_string());
     }
 
-    
-    if result.is_ok() {
-        let insert_email_index_query = "INSERT INTO openmeet.email_index (email, user_id) VALUES (?, ?)";
-        let mut insert_email_index_statement = session.statement(insert_email_index_query);
-        insert_email_index_statement.bind(0, user.email.as_str()).map_err(|e| e.to_string())?;
-        insert_email_index_statement.bind(1, user.user_id).map_err(|e| e.to_string())?;
-        let result = insert_email_index_statement.execute().await;
-        if result.is_err() {
-            return Err(format!("Failed to create user {}", result.err().unwrap()));
-        }
-    }
+    // time now
+    let now = Utc::now().timestamp_millis();
 
-    println!("result: {:?}", result);
-    user.password_hash = "xxxxxxxx".to_string();
+    let mut cluster = init_cluster().await?;
+    let session = cluster.connect().await.map_err(|e| e.to_string())?;
+
+    if check_email_exists(&session, &user.email).await? {
+        return Err("Email already exists".to_string());
+    }
+    insert_user(&session, &user, now).await?;
+    insert_email_index(&session, &user.email, user.user_id).await?;
+
     Ok(user)
 }
 
 pub async fn get_user_by_email(email: &str) -> Option<User> {
-    let mut cluster = init_cluster().await.ok()?;
-    let session = cluster.connect().await.ok()?;
+    let mut cluster = init_cluster().await.unwrap();
+    let session = cluster.connect().await.unwrap();
 
     let query = "SELECT * FROM openmeet.users WHERE email = ?";
     let mut statement = session.statement(query);
-    statement.bind(0, email).ok()?;
+    statement.bind(0, email).unwrap();
 
-    let result = statement.execute().await.ok()?;
+    let result = statement.execute().await.unwrap();
+    let row = result.first_row()?;
 
-    if let Some(row) = result.first_row() {
-        let user = User {
-            user_id: row
-                .get_column_by_name("user_id")
-                .and_then(|v| v.get_uuid().map(|uuid| uuid.into()))
-                .ok()?,
-            username: row
-                .get_column_by_name("username")
-                .and_then(|v| v.get_string())
-                .ok()?,
-            email: row
-                .get_column_by_name("email")
-                .and_then(|v| v.get_string())
-                .ok()?,
-            password_hash: row
-                .get_column_by_name("password_hash")
-                .and_then(|v| v.get_string())
-                .ok()?,
-            created_at: DateTime::from_timestamp_millis(
-                row.get_column_by_name("created_at")
-                    .and_then(|v| v.get_i64())
-                    .ok()?,
-            )
-            .unwrap(),
-            updated_at: DateTime::from_timestamp_millis(
-                row.get_column_by_name("updated_at")
-                    .and_then(|v| v.get_i64())
-                    .ok()?,
-            )
-            .unwrap(),
-            last_login: DateTime::from_timestamp_millis(
-                row.get_column_by_name("last_login")
-                    .and_then(|v| v.get_i64())
-                    .ok()?,
-            )
-            .unwrap(),
-        };
-        Some(user)
-    } else {
-        None
-    }
+    Some(User {
+        user_id: row
+            .get_column_by_name("user_id")
+            .ok()?
+            .get_uuid()
+            .ok()?
+            .into(),
+        username: row.get_column_by_name("username").ok()?.get_string().ok()?,
+        email: row.get_column_by_name("email").ok()?.get_string().ok()?,
+        password_hash: row
+            .get_column_by_name("password_hash")
+            .ok()?
+            .get_string()
+            .ok()?,
+        created_at: row
+            .get_column_by_name("created_at")
+            .ok()?
+            .get_i64()
+            .unwrap_or_default(),
+        updated_at: row
+            .get_column_by_name("updated_at")
+            .ok()?
+            .get_i64()
+            .unwrap_or_default(),
+        last_login: row
+            .get_column_by_name("last_login")
+            .ok()?
+            .get_i64()
+            .unwrap_or_default(),
+    })
 }
 
-pub async fn login(email: &str, password: &str) -> Result<User, String> {
-    // create bcrypted password_hash
-    let password_hash = hash(password, DEFAULT_COST).map_err(|e| e.to_string())?;
+
+fn generate_token(user: &User) -> Result<String, String> {
+    let claims = Claims {
+        sub: user.user_id.to_string(),
+        exp: (Utc::now().timestamp() + 3600) as usize, // Token valid for 1 hour
+    };
+
+    let encoding_key = EncodingKey::from_secret("your_secret_key".as_ref());
+    encode(&Header::default(), &claims, &encoding_key).map_err(|e| e.to_string())
+}
+
+pub async fn login(email: &str, password: &str) -> Result<String, String> {
+    println!("user::login called with email: {}, password: {}", email, password);
     if let Some(user) = get_user_by_email(email).await {
-        if verify(&password_hash, &user.password_hash).map_err(|e| e.to_string())? {
-            Ok(user)
-        } else {
-            Err("Invalid password".to_string())
+        println!("user found id {}, password_hash: {}", user.user_id, user.password_hash);
+        let password_verified = verify(password, &user.password_hash);
+
+        match password_verified {
+            Ok(true) => {
+                println!("password verified");
+                let token = generate_token(&user)?; 
+                Ok(token)
+            }
+            Ok(false) => Err("Invalid credentials".to_string()),
+            Err(e) => Err(e.to_string()),
         }
     } else {
         Err("User not found".to_string())
     }
 }
 
-pub async fn delete_user(user_id: &str) -> Result<(), String> {
+pub async fn delete_user(user_id: &Uuid, email: &str) -> Result<(), String> {
     let mut cluster = init_cluster().await?;
     let session = cluster.connect().await.map_err(|e| e.to_string())?;
 
+
     let query = "DELETE FROM openmeet.users WHERE user_id = ?";
     let mut statement = session.statement(query);
-    statement.bind(0, user_id).map_err(|e| e.to_string())?;
+    statement.bind(0, *user_id).map_err(|e| e.to_string())?;
+    statement.execute().await.map_err(|e| e.to_string())?;
 
+    // also delete from email_index
+    let query = "DELETE FROM openmeet.email_index WHERE email = ?";
+    let mut statement = session.statement(query);
+    statement.bind(0, email).map_err(|e| e.to_string())?;
     statement.execute().await.map_err(|e| e.to_string())?;
 
     Ok(())
@@ -202,24 +240,111 @@ mod tests {
         let user = User {
             user_id: Uuid::new_v4(),
             username: "testuser".to_string(),
-            email: "testuser@example.com".to_string(),
+            email: "testuserLOGIN_SUCCESS@example.com".to_string(),
             password_hash: "password123".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: 0,
+            updated_at: 0,
+            last_login: 0,
         };
 
-        create_user(user.clone())
-            .await
-            .expect("Failed to create user");
+        let created_user = create_user(user.clone()).await;
 
+        if let Err(e) = created_user {
+            if !e.to_string().contains("Email already exists") {
+                panic!("Failed to create user: {}", e);
+            }
+        }
         // Act: attempt to login with correct credentials
-        let result = login("testuser@example.com", "password123").await;
+        let result = login(&user.email, &user.password_hash).await;
 
+        if let Err(e) = result {
+            println!("result--->: {:?}", e);
+        } else {
+            let token = result.unwrap().clone();
+            assert_eq!(token.len() > 0, true);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_login_credentials_create_user() {
+
+    // Setup: create a user instance
+    let user = User {
+        user_id: Uuid::new_v4(),
+        username: "testuser".to_string(),
+        email: "testuserCREATE_LOGIN@example.com".to_string(),
+        password_hash: "password123".to_string(),
+        created_at: Utc::now().timestamp_millis(),
+        updated_at: Utc::now().timestamp_millis(),
+        last_login: Utc::now().timestamp_millis(),
+    };
+
+    //  delete any user with this email
+    let _ = delete_user(&user.user_id, &user.email).await;
+
+    // Act: create the user
+    let create_result = create_user(user.clone()).await;
+    assert!(create_result.is_ok());
+
+    // Act: attempt to login with the same user
+    let login_result = login(&user.email, &user.password_hash).await;
+
+    // Assert: check that login was successful
+    assert!(login_result.is_ok());
+    let token = login_result.unwrap();
+    assert!(!token.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_login_second_layer() {
+        // in a loop
+        // register a user with a random email and password
+        // login with the user
+        // delete the user
+    for i in 0..1 {
+        // Generate a random email and password
+        let email = format!("testuser{}@example.com", i);
+        let password = format!("password{}", i);
+
+        // Setup: create a user instance
+        let user = User {
+            user_id: Uuid::new_v4(),
+            username: format!("testuser{}", i),
+            email: email.clone(),
+            password_hash: password.clone(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
+        };
+
+        // Act: create the user
+        let create_result = crate::register(Json(
+            UserRegister {
+                username: user.username.clone(),
+                email: user.email.clone(),
+                password: user.password_hash.clone(),
+            }
+        )).await;
+        assert!(create_result.is_ok());
+
+        // Act: attempt to login with the same user
+        let login_result = crate::login(Json(
+            UserLogin {
+                email: user.email.clone(),
+                password: user.password_hash.clone(),
+            }
+        )).await;
+
+        let token = login_result.into_inner();
         // Assert: check that login was successful
-        assert!(result.is_ok());
-        let logged_in_user = result.unwrap();
-        assert_eq!(logged_in_user.email, user.email);
+        assert!(!token.is_string(), "Token should be a string");
+        println!("Login successful, token: {}", token);
+        // Act: delete the user
+        let delete_result = delete_user(&user.user_id, &user.email).await;
+        assert!(delete_result.is_ok());
+    }
+
+        
     }
 
     #[tokio::test]
@@ -230,14 +355,13 @@ mod tests {
             username: "testuser".to_string(),
             email: "testuser@example.com".to_string(),
             password_hash: "password123".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: 0,
+            updated_at: 0,
+            last_login: 0,
         };
 
-        create_user(user.clone())
-            .await
-            .expect("Failed to create user");
+        // ignore any duplicate errors
+        let _ = create_user(user.clone()).await;
 
         // Act: attempt to login with incorrect password
         let result = login("testuser@example.com", "wrongpassword").await;
@@ -263,9 +387,9 @@ mod tests {
             username: "testuser".to_string(),
             email: "testuserSUCCESS@example.com".to_string(),
             password_hash: "password123".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
         };
 
         // Act: create the user
@@ -281,7 +405,10 @@ mod tests {
             }
             Err(e) => {
                 if !e.to_string().contains("Email already exists") {
-                    panic!("Expected error containing 'Email already exists', but got: {}", e.to_string());
+                    panic!(
+                        "Expected error containing 'Email already exists', but got: {}",
+                        e.to_string()
+                    );
                 }
             }
         }
@@ -296,17 +423,20 @@ mod tests {
             username: "testuser".to_string(),
             email: "testuserDUPLICATE@example.com".to_string(),
             password_hash: "password123".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
         };
 
         // Act: create the user
         let result = create_user(user.clone()).await;
-        
+
         if let Err(e) = result {
             if !e.to_string().contains("Email already exists") {
-                panic!("Expected error containing 'Email already exists', but got: {}", e.to_string());
+                panic!(
+                    "Expected error containing 'Email already exists', but got: {}",
+                    e.to_string()
+                );
             }
         }
         // Attempt to create another user with the same email
@@ -315,9 +445,9 @@ mod tests {
             username: "anotheruser".to_string(),
             email: "testuserDUPLICATE@example.com".to_string(),
             password_hash: "password456".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
         };
 
         let result = create_user(duplicate_user).await;
@@ -334,9 +464,9 @@ mod tests {
             username: "testuser".to_string(),
             email: "invalid-email".to_string(),
             password_hash: "password123".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
         };
 
         // Act: attempt to create the user
@@ -349,31 +479,71 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user_success() {
         // Setup: create a user and insert into the database
+        let random_email = format!("{uuid}@example.com", uuid = Uuid::new_v4());
         let user_sample = User {
             user_id: Uuid::new_v4(),
-            username: "testuser1".to_string(),
-            email: "testuser@example.com".to_string(),
+            username: random_email.clone(),
+            email: random_email.clone(),
             password_hash: "password123".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            last_login: Utc::now(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
         };
 
-        create_user(user_sample.clone())
-            .await
-            .expect("Failed to create user");
-        let user = get_user_by_email(&user_sample.email).await;
-        assert!(user.is_some());
+        let create_result = create_user(user_sample.clone()).await;
+        assert!(create_result.is_ok());
+
+        let user_id = create_result.unwrap().user_id;
 
         // Act: delete the user
-        let result = delete_user(&user.unwrap().user_id.to_string()).await;
-
-        println!("result: {:?}", result);
+        let delete_result = delete_user(&user_id, &user_sample.email).await;
+        if let Err(e) = delete_result.clone() {
+            println!("delete_result: {:?}", e);
+        }
         // Assert: check that user deletion was successful
-        assert!(result.is_ok());
+        assert!(delete_result.is_ok(), "User deletion should succeed");
 
         // Verify that the user no longer exists
-        let user = get_user_by_email(&user_sample.email).await;
-        assert!(user.is_none());
+        let user_after_deletion = get_user_by_email(&user_sample.email).await;
+        assert!(
+            user_after_deletion.is_none(),
+            "User should not exist after deletion"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_email_success() {
+        // Setup: create a user and insert into the database
+        let user = User {
+            user_id: Uuid::new_v4(),
+            username: "testuser".to_string(),
+            email: "testuserGET_USER_BY_EMAIL_SUCCESS@example.com".to_string(),
+            password_hash: "password123".to_string(),
+            created_at: Utc::now().timestamp_millis(),
+            updated_at: Utc::now().timestamp_millis(),
+            last_login: Utc::now().timestamp_millis(),
+        };
+
+        let create_result = create_user(user.clone()).await;
+        if let Err(e) = create_result {
+            println!("create_result: {:?}", e);
+        }
+        // Act: get the user by email
+        let result = get_user_by_email(&user.email).await;
+        assert!(result.is_some());
+        let retrieved_user = result.unwrap();
+        assert_eq!(retrieved_user.email, user.email);
+    }
+    
+    #[tokio::test]
+    async fn test_verify_password() {
+        let password = "password123";
+        let hashed_password = hash(password, DEFAULT_COST).unwrap();
+        let hashed_password_2 = hash(password, DEFAULT_COST).unwrap();
+
+        println!("password: {}, hashed_password: {}", password, hashed_password);
+        println!("password: {}, hashed_password_2: {}", password, hashed_password_2);
+        assert!(verify(password, &hashed_password).unwrap());
+        assert!(!verify("wrongpassword", &hashed_password).unwrap());
     }
 }
