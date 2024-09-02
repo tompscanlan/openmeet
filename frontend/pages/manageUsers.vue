@@ -4,8 +4,8 @@
       <ul>
         <li v-for="user in users" :key="user.user_id">
           {{ user.username }} ({{ user.email }})
-          <button @click="deleteUser(user.user_id)">Delete</button>
-          <button @click="resetPassword(user.email)">Reset Password</button>
+          <button class="delete-button" @click="deleteUser(user.user_id)">Delete</button>
+          <button class="reset-button" @click="resetPassword(user.email)">Reset Password</button>
         </li>
       </ul>
     </div>
@@ -21,9 +21,9 @@ export default {
     const router = useRouter();
 
     const checkAuth = () => {
-      const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+      const token = localStorage.getItem('token'); 
       if (!token) {
-        router.push('/login'); // Redirect to login if not authenticated
+        router.push('/login');
       }
     };
 
@@ -60,7 +60,7 @@ export default {
     };
 
     onMounted(() => {
-      checkAuth(); // Check authentication on mount
+      checkAuth();
       fetchUsers();
     });
 

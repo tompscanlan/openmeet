@@ -1,14 +1,14 @@
 use rocket::http::Status;
 use rocket::serde::{json::Json, Serialize};
-use rocket::{get, launch, post, routes};
+use rocket::{get, launch, post, delete, routes};
 use std::env;
 use uuid::Uuid;
 mod user;
-use crate::user::{create_user, User, UserLogin, UserRegister};
+use crate::user::{create_user, User, UserLogin, UserRegister, delete_user, get_all_users, get_user_by_id};
 use cassandra_cpp::Cluster;
 use serde_json::json;
-use bcrypt::DEFAULT_COST;
-use bcrypt::hash;
+mod middleware;
+use crate::middleware::auth::AuthToken;
 
 #[derive(Serialize)]
 struct SuccessResponse {
@@ -20,6 +20,12 @@ struct LoginResponse {
     token: String,
 }
 
+#[derive(Serialize)]
+struct UserReset {
+    email: String,
+    old_password: String,
+    new_password: String,
+}
 use chrono::Utc;
 
 #[post("/register", data = "<user_register>")]
@@ -49,10 +55,45 @@ async fn register(user_register: Json<UserRegister>) -> Result<Json<SuccessRespo
     }))
 }
 
+
+#[delete("/users/<user_id>")]
+async fn frontend_delete_user(_auth: AuthToken,user_id: &str) -> Result<Json<SuccessResponse>, Status> {
+    let user_id = Uuid::parse_str(user_id).map_err(|e| {
+        eprintln!("Invalid UUID: {}", e);
+        Status::BadRequest
+    })?;
+
+    let user = get_user_by_id(user_id).await;
+    if user.is_none() {
+        return Err(Status::NotFound);
+    }
+    let user = user.unwrap();
+
+    let result = delete_user(&user_id, &user.email).await;
+    match result {
+        Ok(_) => Ok(Json(SuccessResponse {
+            message: "User deleted successfully".to_string(),
+        })),
+        Err(e) => {
+            eprintln!("Failed to delete user: {}", e);
+            return Err(Status::InternalServerError);
+        }
+    }
+}
+#[get("/users")]
+async fn list_users(_auth: AuthToken) -> Result<Json<Vec<User>>, Status> {
+    match get_all_users().await {
+        Ok(users) => Ok(Json(users)),
+        Err(e) => {
+            eprintln!("Failed to retrieve users: {}", e);
+            Err(Status::InternalServerError)
+        }
+    }
+}
+
 #[post("/login", data = "<user_login>")]
-async fn login(user_login: Json<UserLogin>) -> Json<serde_json::Value> {
+async fn frontend_login(user_login: Json<UserLogin>) -> Json<serde_json::Value> {
     let user = user_login.into_inner();
-    println!("received /login request for user {}, password {}", user.email, user.password);
         match user::login(&user.email, &user.password).await {
             Ok(token) => {
                 println!("token: {:?}", token);
@@ -64,7 +105,27 @@ async fn login(user_login: Json<UserLogin>) -> Json<serde_json::Value> {
             }
         }
     }
+    // #[post("/reset_password", data = "<user_reset>")]
+    // async fn reset_password(user_reset: Json<UserReset>) -> Result<Json<SuccessResponse>, Status> {
+    //     let user_reset = user_reset.into_inner();
+    //     let user = user::get_user_by_email(&user_reset.email).await;
+    
+    //     if user.is_none() {
+    //         return Err(Status::NotFound);
+    //     }
+    
+    //     let mut user = user.unwrap();
+    //     user.password_hash = hash(&user_reset.new_password, DEFAULT_COST).map_err(|e| e.to_string())?;
+        
+    //     // Update user in the database (you'll need to implement this)
+    //     // update_user(&user).await?;
+    
+    //     Ok(Json(SuccessResponse {
+    //         message: "Password reset successfully".to_string(),
+    //     }))
+    // }
 
+    
 #[get("/")]
 fn index() -> &'static str {
     "Welcome to the API"
@@ -72,7 +133,7 @@ fn index() -> &'static str {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index, register, login])
+    rocket::build().mount("/", routes![index, register, frontend_login, list_users, frontend_delete_user])
 }
 
 pub async fn init_cluster() -> Result<Cluster, String> {

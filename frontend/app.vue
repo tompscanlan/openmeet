@@ -3,7 +3,7 @@
     <nav>
       <NuxtLink to="/">Home</NuxtLink>
       <NuxtLink to="/manageUsers">Manage Users</NuxtLink>
-      
+
       <NuxtLink to="/login">Login</NuxtLink>
       <NuxtLink to="/logout">Logout</NuxtLink>
     </nav>
@@ -12,21 +12,18 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { useHead } from '#app'
+useHead({
+  title: 'OpenMeet',
+  meta: [
+    { name: 'description', content: 'Organize local meetups easily while keeping your data private.' }
+  ],
+  link: [
+    { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' }
+  ]
+})
 
-export default {
-  name: 'HomePage',
-  components: {
-  }
-}
+
+
 </script>
-
-<style scoped>
-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: right;
-  padding: 1rem;
-  background-color: #f0f0f0;
-}
-</style>

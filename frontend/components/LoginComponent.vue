@@ -51,31 +51,3 @@ const handleLogin = async () => {
   }
 }
 </script>
-
-<style scoped>
-.login {
-  max-width: 300px;
-  margin: 0 auto;
-}
-
-input {
-  display: block;
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 5px;
-}
-
-button {
-  width: 100%;
-  padding: 10px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-.error {
-  color: red;
-  margin-top: 10px;
-}
-</style>

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use jsonwebtoken::{encode, Header, EncodingKey};
 use crate::Json;
-
+use cassandra_cpp::LendingIterator;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
@@ -135,6 +135,29 @@ pub async fn create_user(original_user: User) -> Result<User, String> {
     Ok(user)
 }
 
+pub async fn get_user_by_id(user_id: Uuid) -> Option<User> {
+
+    let mut cluster = init_cluster().await.unwrap();
+    let session = cluster.connect().await.unwrap();
+
+    let query = "SELECT * FROM openmeet.users WHERE user_id = ?";
+    let mut statement = session.statement(query);
+    statement.bind(0, user_id).unwrap();
+
+    let result = statement.execute().await.unwrap();
+    let row = result.first_row()?;
+
+    Some(User {
+        user_id: row.get_column_by_name("user_id").unwrap().get_uuid().unwrap().into(),
+        username: row.get_column_by_name("username").unwrap().get_string().unwrap(),
+        email: row.get_column_by_name("email").unwrap().get_string().unwrap(),
+        password_hash: row.get_column_by_name("password_hash").unwrap().get_string().unwrap(),
+        created_at: row.get_column_by_name("created_at").unwrap().get_i64().unwrap(),
+        updated_at: row.get_column_by_name("updated_at").unwrap().get_i64().unwrap(),
+        last_login: row.get_column_by_name("last_login").unwrap().get_i64().unwrap(),
+    })
+}
+
 pub async fn get_user_by_email(email: &str) -> Option<User> {
     let mut cluster = init_cluster().await.unwrap();
     let session = cluster.connect().await.unwrap();
@@ -190,14 +213,11 @@ fn generate_token(user: &User) -> Result<String, String> {
 }
 
 pub async fn login(email: &str, password: &str) -> Result<String, String> {
-    println!("user::login called with email: {}, password: {}", email, password);
     if let Some(user) = get_user_by_email(email).await {
-        println!("user found id {}, password_hash: {}", user.user_id, user.password_hash);
         let password_verified = verify(password, &user.password_hash);
 
         match password_verified {
             Ok(true) => {
-                println!("password verified");
                 let token = generate_token(&user)?; 
                 Ok(token)
             }
@@ -213,6 +233,11 @@ pub async fn delete_user(user_id: &Uuid, email: &str) -> Result<(), String> {
     let mut cluster = init_cluster().await?;
     let session = cluster.connect().await.map_err(|e| e.to_string())?;
 
+    let user = get_user_by_email(email).await;
+    if user.is_none() {
+        return Err("User not found".to_string());
+    }
+    // let user = user.unwrap();
 
     let query = "DELETE FROM openmeet.users WHERE user_id = ?";
     let mut statement = session.statement(query);
@@ -227,6 +252,46 @@ pub async fn delete_user(user_id: &Uuid, email: &str) -> Result<(), String> {
 
     Ok(())
 }
+pub async fn get_all_users() -> Result<Vec<User>, String> {
+    let mut cluster = init_cluster().await?;
+    let session = cluster.connect().await.map_err(|e| e.to_string())?;
+
+    let query = "SELECT * FROM openmeet.users";
+    let statement = session.statement(query);
+    let result = statement.execute().await.map_err(|e| e.to_string())?;
+
+    let mut users = Vec::new();
+    let mut iter = result.iter();
+    while let Some(row) = iter.next() {
+        users.push(User {
+            user_id: row.get_column_by_name("user_id").ok()
+                .and_then(|col| col.get_uuid().ok())
+                .ok_or("Invalid user_id".to_string())?
+                .into(),
+                username: row.get_column_by_name("username").ok()
+                .and_then(|col| col.get_string().ok())
+                .ok_or("Invalid username".to_string())?, // Convert Option to Result
+            email: row.get_column_by_name("email").ok()
+                .and_then(|col| col.get_string().ok())
+                .ok_or("Invalid email".to_string())?, 
+            password_hash: row.get_column_by_name("password_hash").ok()
+                .and_then(|col| col.get_string().ok())
+                .ok_or("Invalid password_hash".to_string())?,
+            created_at: row.get_column_by_name("created_at").ok()
+                .and_then(|col| col.get_i64().ok())
+                .unwrap_or_default(),
+            updated_at: row.get_column_by_name("updated_at").ok()
+                .and_then(|col| col.get_i64().ok())
+                .unwrap_or_default(),
+            last_login: row.get_column_by_name("last_login").ok()
+                .and_then(|col| col.get_i64().ok())
+                .unwrap_or_default(),
+        });
+    }
+    Ok(users)
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -301,10 +366,15 @@ mod tests {
         // register a user with a random email and password
         // login with the user
         // delete the user
-    for i in 0..1 {
+    for i in 0..5 {
         // Generate a random email and password
         let email = format!("testuser{}@example.com", i);
         let password = format!("password{}", i);
+
+        let user = get_user_by_email(email.as_str()).await;
+        if let Some(user) = user {
+            let _ = delete_user(&user.user_id, &user.email).await;
+        }
 
         // Setup: create a user instance
         let user = User {
@@ -321,24 +391,23 @@ mod tests {
         let create_result = crate::register(Json(
             UserRegister {
                 username: user.username.clone(),
-                email: user.email.clone(),
-                password: user.password_hash.clone(),
+                email: email.clone(),
+                password: password.clone(),
             }
         )).await;
         assert!(create_result.is_ok());
 
         // Act: attempt to login with the same user
-        let login_result = crate::login(Json(
+        let login_result = crate::frontend_login(Json(
             UserLogin {
-                email: user.email.clone(),
-                password: user.password_hash.clone(),
+                email: email.clone(),
+                password: password.clone(),
             }
         )).await;
-
+              
         let token = login_result.into_inner();
         // Assert: check that login was successful
         assert!(!token.is_string(), "Token should be a string");
-        println!("Login successful, token: {}", token);
         // Act: delete the user
         let delete_result = delete_user(&user.user_id, &user.email).await;
         assert!(delete_result.is_ok());
