@@ -1,8 +1,7 @@
 <template>
-    <div>
-      <RegisterComponent />
-    </div>
-  </template>
-  
-  <script setup>
-  </script>
+  <div>
+    <RegisterComponent />
+  </div>
+</template>
+
+<script setup></script>

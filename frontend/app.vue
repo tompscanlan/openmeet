@@ -8,22 +8,24 @@
       <NuxtLink to="/logout">Logout</NuxtLink>
     </nav>
     <NuxtPage />
- 
   </div>
 </template>
 
 <script setup>
-import { useHead } from '#app'
+import { useHead } from "#app";
 useHead({
-  title: 'OpenMeet',
+  title: "OpenMeet",
   meta: [
-    { name: 'description', content: 'Organize local meetups easily while keeping your data private.' }
+    {
+      name: "description",
+      content: "Organize local meetups easily while keeping your data private.",
+    },
   ],
   link: [
-    { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap' }
-  ]
-})
-
-
-
+    {
+      rel: "stylesheet",
+      href: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap",
+    },
+  ],
+});
 </script>
