@@ -25,7 +25,7 @@ const password = ref("");
 const error = ref("");
 const router = useRouter();
 
-const handleLogin = async () => {
+const postLogin = async () => {
   try {
     const response = await fetch("http://localhost:8000/login", {
       method: "POST",
@@ -45,7 +45,42 @@ const handleLogin = async () => {
     }
 
     if (data.token) {
-      localStorage.setItem("token", data.token);
+      return data.token;
+    } else {
+      throw new Error("No token received");
+    }
+
+  } catch (err) {
+    console.error("Login failed", err);
+    error.value = err.message + error.value;
+  }
+};
+
+const getUser = async (email) => {
+  const token = localStorage.getItem("token");
+  const userResponse = await fetch(`http://localhost:8000/whoami/${email}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+  });
+  const userData = await userResponse.json();
+  return userData;
+}
+
+const handleLogin = async () => {
+  localStorage.setItem("email", email.value);
+  try {
+    const token = await postLogin();
+    
+    if (token) {
+      localStorage.setItem("token", token);
+    
+      const user = await getUser(email.value);
+      localStorage.setItem("user", JSON.stringify(user));
+      console.log("user data in local storage:", user);
+
       router.push("/");
     } else {
       throw new Error("No token received");
@@ -54,5 +89,8 @@ const handleLogin = async () => {
     console.error("Login failed", err);
     error.value = err.message + error.value;
   }
+
+
+
 };
 </script>

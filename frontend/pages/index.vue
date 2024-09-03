@@ -11,12 +11,12 @@
     </ul>
 
     <h2>Getting Started</h2>
-    <ol>
+    <ul>
       <li>Clone the repository</li>
       <li>Deploy CassandraDB for data storage</li>
       <li>Deploy the API and Frontend services</li>
       <li>Point your DNS at the deployed services</li>
       <li>Invite friends to join your local community</li>
-    </ol>
+    </ul>
   </div>
 </template>

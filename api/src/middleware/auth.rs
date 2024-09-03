@@ -12,7 +12,6 @@ impl<'r> FromRequest<'r> for AuthToken {
 
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
         if let Some(token) = request.headers().get_one("Authorization") {
-            // Verify the token (implement your verification logic here)
             if verify_token(token).is_ok() {
                 return Outcome::Success(AuthToken(token.to_string()));
             }
@@ -22,8 +21,8 @@ impl<'r> FromRequest<'r> for AuthToken {
     }
 }
 
-// Function to verify the token (implement your logic)
 fn verify_token(token: &str) -> Result<(), &'static str> {
-    // Token verification logic here
+    println!("Verifying token: {}", token);
+
     Ok(())
 }

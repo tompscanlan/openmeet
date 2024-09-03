@@ -3,7 +3,7 @@
     <nav>
       <NuxtLink to="/">Home</NuxtLink>
       <NuxtLink to="/manageUsers">Manage Users</NuxtLink>
-
+      <NuxtLink to="/createEvent">Create Event</NuxtLink>
       <NuxtLink to="/login">Login</NuxtLink>
       <NuxtLink to="/logout">Logout</NuxtLink>
     </nav>
