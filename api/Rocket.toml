@@ -1,0 +1,2 @@
+[global.databases.openmeet]
+url = cassandra1.int.butterhead.net

@@ -15,61 +15,55 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 
-export default {
-  setup() {
-    const users = ref([]);
-    const router = useRouter();
+const users = ref([]);
+const router = useRouter();
 
-    const checkAuth = () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-      }
-    };
-
-    const fetchUsers = async () => {
-      const response = await fetch("http://localhost:8000/users", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`, // Include token in request
-        },
-      });
-      users.value = await response.json();
-    };
-
-    const deleteUser = async (userId) => {
-      await fetch(`http://localhost:8000/users/${userId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`, // Include token in request
-        },
-      });
-      await fetchUsers();
-    };
-
-    const resetPassword = async (email) => {
-      const newPassword = prompt("Enter new password:");
-      if (newPassword) {
-        await fetch("http://localhost:8000/reset_password", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, new_password: newPassword }),
-        });
-        await fetchUsers();
-      }
-    };
-
-    onMounted(() => {
-      checkAuth();
-      fetchUsers();
-    });
-
-    return { users, deleteUser, resetPassword };
-  },
+const checkAuth = () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    router.push("/login");
+  }
 };
+
+const fetchUsers = async () => {
+  const response = await fetch("http://localhost:3000/api/users", {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  users.value = await response.json();
+};
+
+const deleteUser = async (userId) => {
+  await fetch(`http://localhost:3000/api/users/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  await fetchUsers();
+};
+
+const resetPassword = async (email) => {
+  const newPassword = prompt("Enter new password:");
+  if (newPassword) {
+    await fetch("http://localhost:3000/api/reset_password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, new_password: newPassword }),
+    });
+    await fetchUsers();
+  }
+};
+
+onMounted(() => {
+  checkAuth();
+  fetchUsers();
+});
 </script>

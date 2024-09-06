@@ -13,6 +13,7 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 onMounted(() => {
   localStorage.removeItem("token");
+  localStorage.removeItem("user");
   router.push("/");
 });
 </script>

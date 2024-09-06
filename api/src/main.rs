@@ -13,6 +13,10 @@ use cassandra_cpp::Cluster;
 use serde_json::json;
 mod middleware;
 use crate::middleware::auth::AuthToken;
+use chrono::Utc;
+
+mod cassandra_pool;
+use cassandra_pool::{CassandraPool, CassandraConnection};
 
 #[derive(Serialize)]
 struct SuccessResponse {
@@ -30,10 +34,39 @@ struct UserReset {
     old_password: String,
     new_password: String,
 }
-use chrono::Utc;
+
+
+#[launch]
+fn rocket() -> _ {
+    let cassandra_pool = CassandraPool::new("cassandra1.int.butterhead.net").expect("Failed to create Cassandra pool");
+    rocket::build()
+    .manage(cassandra_pool)
+    .mount(
+        "/",
+        routes![
+            index,
+            register,
+            frontend_login,
+            list_users,
+            frontend_delete_user,
+            frontend_create_event,
+            whoami,
+            frontend_delete_event
+        ],
+    )
+}
+
+async fn get_connection(pool: &CassandraPool) -> Result<CassandraConnection, Status> {
+    
+    let conn = pool.0.get().await.map_err(|e| {
+        eprintln!("Failed to get connection: {}", e);
+        Status::InternalServerError
+    })?;
+    Ok(CassandraConnection(conn))
+}
 
 #[post("/register", data = "<user_register>")]
-async fn register(user_register: Json<UserRegister>) -> Result<Json<SuccessResponse>, Status> {
+async fn register(conn: CassandraConnection, user_register: Json<UserRegister>) -> Result<Json<SuccessResponse>, Status> {
     let user_register = user_register.into_inner();
 
     let now = Utc::now().timestamp();
@@ -41,13 +74,15 @@ async fn register(user_register: Json<UserRegister>) -> Result<Json<SuccessRespo
         user_id: Uuid::new_v4(),
         username: user_register.username.clone(),
         email: user_register.email.clone(),
-        password_hash: user_register.password.clone(),
-        created_at: now,
-        updated_at: now,
-        last_login: 0,
+        password_hash: Some(user_register.password.clone()),
+        description: None,
+        interests: Vec::new(),
+        created_at: None,
+        updated_at: None,
+        last_login: None,
     };
 
-    create_user(new_user).await.map_err(|e| {
+    create_user(conn, new_user).await.map_err(|e| {
         eprintln!("Failed to create user: {}", e);
         Status::InternalServerError
     })?;
@@ -59,6 +94,7 @@ async fn register(user_register: Json<UserRegister>) -> Result<Json<SuccessRespo
 
 #[delete("/users/<user_id>")]
 async fn frontend_delete_user(
+    conn: CassandraConnection,
     _auth: AuthToken,
     user_id: &str,
 ) -> Result<Json<SuccessResponse>, Status> {
@@ -67,13 +103,13 @@ async fn frontend_delete_user(
         Status::BadRequest
     })?;
 
-    let user = get_user_by_id(user_id).await;
+    let user = get_user_by_id(conn, user_id).await;
     if user.is_none() {
         return Err(Status::NotFound);
     }
     let user = user.unwrap();
 
-    let result = delete_user(&user_id, &user.email).await;
+    let result = delete_user(&conn, &user_id, &user.email).await;
     match result {
         Ok(_) => Ok(Json(SuccessResponse {
             message: "User deleted successfully".to_string(),
@@ -103,12 +139,12 @@ async fn frontend_delete_user(
 // }
 
 #[get("/users/<user_id>")]
-async fn get_user(_auth: AuthToken, user_id: &str) -> Result<Json<User>, Status> {
+async fn get_user(conn: CassandraConnection, _auth: AuthToken, user_id: &str) -> Result<Json<User>, Status> {
     let user_id = Uuid::parse_str(user_id).map_err(|e| {
         eprintln!("Invalid UUID: {}", e);
         Status::BadRequest
     })?;
-    let user = get_user_by_id(user_id).await;
+    let user = get_user_by_id(conn, user_id).await;
     match user {
         Some(user) => Ok(Json(user)),
         None => Err(Status::NotFound),
@@ -116,11 +152,15 @@ async fn get_user(_auth: AuthToken, user_id: &str) -> Result<Json<User>, Status>
 }
 
 #[get("/whoami/<email>")]
-async fn whoami(_auth: AuthToken, email: &str) -> Result<Json<User>, Status> {
-    let user = users::get_user_by_email(email).await;
+async fn whoami(conn: CassandraConnection, _auth: AuthToken, email: &str) -> Result<Json<User>, Status> {
+    let user = users::get_user_by_email(conn,email).await;
     match user {
-        Some(user) => Ok(Json(user)),
-        None => Err(Status::NotFound),
+        Ok(Some(user)) => Ok(Json(user)),
+        Ok(None) => Err(Status::NotFound),
+        Err(e) => {
+            eprintln!("Failed to retrieve user: {}", e);
+            Err(Status::InternalServerError)
+        }
     }
 }
 
@@ -136,9 +176,9 @@ async fn list_users(_auth: AuthToken) -> Result<Json<Vec<User>>, Status> {
 }
 
 #[post("/login", data = "<user_login>")]
-async fn frontend_login(user_login: Json<UserLogin>) -> Json<serde_json::Value> {
+async fn frontend_login(conn: CassandraConnection, user_login: Json<UserLogin>) -> Json<serde_json::Value> {
     let user = user_login.into_inner();
-    match users::login(&user.email, &user.password).await {
+    match users::login(conn, &user.email, &user.password).await {
         Ok(token) => {
             println!("token: {:?}", token);
             Json(json!({ "success": true, "message": "Login successful", "token": token }))
@@ -173,44 +213,6 @@ async fn frontend_login(user_login: Json<UserLogin>) -> Json<serde_json::Value> 
 fn index() -> &'static str {
     "Welcome to the API"
 }
-
-#[launch]
-fn rocket() -> _ {
-    rocket::build().mount(
-        "/",
-        routes![
-            index,
-            register,
-            frontend_login,
-            list_users,
-            frontend_delete_user,
-            frontend_create_event,
-            whoami,
-            frontend_delete_event
-        ],
-    )
-}
-
-pub async fn init_cluster() -> Result<Cluster, String> {
-    let mut cluster = Cluster::default();
-    let contact_points = env::var("CASSANDRA_CONTACT_POINTS")
-        .map_err(|_| "CASSANDRA_CONTACT_POINTS environment variable not set".to_string())?;
-    cluster
-        .set_contact_points(&contact_points)
-        .map_err(|e| format!("Failed to set contact points: {}", e))?;
-
-    let username = env::var("CASSANDRA_USERNAME").unwrap_or_default();
-    let password = env::var("CASSANDRA_PASSWORD").unwrap_or_default();
-
-    if !username.is_empty() && !password.is_empty() {
-        cluster
-            .set_credentials(&username, &password)
-            .map_err(|e| format!("Failed to set credentials: {}", e))?;
-    }
-
-    Ok(cluster)
-}
-
 // #[put("/events/<event_id>", data = "<event>")]
 // pub async fn update_event(event_id: Uuid, event: Json<CreateEventRequest>, user_id: Uuid) -> Result<Json<Event>, Status> {
 //     let updated_event = Event {
