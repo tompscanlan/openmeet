@@ -1,27 +1,30 @@
 # OpenMeet
 
-This project is intended to be a lot like meetup.com but more for groups of people who live near each other, people you run into often, or people you'd like to know better.  You can take this project and host your own meetup.com focused on your local community, or be the parent who can can organize all the kids at the playground to a regular event.  Do these things without losing control of your personal data.
+This project is intended to be a lot like meetup.com or facebook groups, but for building local communities without selling your data to advertisers.  You can take this project and host your own instance laser focused on your neighboorhood, your church, university or other community based institution. Or you could be the parent who can can organize all the kids at the playground to a weekly event.  Do these things without losing control of your personal data.
 
-
-I want every user to be able to make sure their data can leave with them. I want communities to win, not facebook. 
-I want organizing a meetup to be as easy as possible, and that means free. 
+I want every user to be able to make sure their data can leave with them. I want communities to win, not engagement for facebook. 
+I want organizing a meetup to be as easy as possible of as many people as possible.
 
 ## How to get started?
+Head to openmeet.com and sign up for an account. Or head to downloads/quickstart and run your own instance.
+
+### Your own instance
 
 1. Clone the repository
 2. Deploy the CassandraDB, This is where your data will live.  You can choose to federate with others and break off onto your own again later
 3. Deploy the API and Front end services somwhere
-4. point your dns at it
+4. point your dns at it all
 5. Invite your friends to the url
 6. If they sign up with you, their data never leaves your cluster
-7. If they sign up at our site, We'll keep a thin layer of profile data so that they can pull over their own data into your instance.
-8. if your events move from the public site to your own,  
-
+7. If they sign up at our site, openmeet.net, We'll keep a thin layer of profile data so that they can pull over their own data into a private instance as desired.
 
 ## Features
 
 1. Import/export your data from a private instance, to the public instance or to another private instance
 2. Find events happening nearby, at a specific date, or look them up by host.
+3. spontaneous events that group members can be notified of
+4. Free to use, free to host your own instance
+
 
 ## MVP
 
