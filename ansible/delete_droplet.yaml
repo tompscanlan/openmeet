@@ -25,12 +25,3 @@
         ttl: 300
         type: A
       delegate_to: localhost
-    # - name: add host into ansible inventory
-    #   ansible.builtin.add_host:
-    #     name: "{{ my_droplet.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first | default('<none>', true) }}"
-    #     groups: cassandra
-    #     hostname: cassandra01
-    #     ansible_host: "{{ my_droplet.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first | default('<none>', true) }}"
-    #     ansible_user: root
-    #     ansible_port: 22
-    #     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
