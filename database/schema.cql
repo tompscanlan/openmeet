@@ -77,37 +77,23 @@ CREATE TABLE user_comments (
 
 -- data
 
--- Populate Users table
-INSERT INTO users (user_id, username, email, password_hash, created_at, updated_at, last_login)
-VALUES (uuid(), 'john_doe', 'john@example.com', 'hashed_password_1', toTimestamp(now()), toTimestamp(now()), toTimestamp(now()));
 
-INSERT INTO users (user_id, username, email, password_hash, created_at, updated_at, last_login)
-VALUES (uuid(), 'jane_smith', 'jane@example.com', 'hashed_password_2', toTimestamp(now()), toTimestamp(now()), toTimestamp(now()));
+-- Insert sample data into users table
+INSERT INTO openmeet.users (user_id, username, email, password_hash, created_at, updated_at, last_login) VALUES (uuid(), 'john_doe', 'john@example.com', 'hashed_password_1', toTimestamp(now()), toTimestamp(now()), toTimestamp(now()));
+INSERT INTO openmeet.users (user_id, username, email, password_hash, created_at, updated_at, last_login) VALUES (uuid(), 'jane_smith', 'jane@example.com', 'hashed_password_2', toTimestamp(now()), toTimestamp(now()), toTimestamp(now()));
 
--- Populate Events table
-INSERT INTO events (event_id, creator_id, title, description, start_time, end_time, lat, lon, address, created_at, updated_at)
-VALUES (uuid(), 123e4567-e89b-12d3-a456-426614174000, 'Tech Meetup', 'Join us for a tech discussion', '2023-06-15 18:00:00', '2023-06-15 20:00:00', 40.7128, -74.0060, '123 Main St, New York, NY', toTimestamp(now()), toTimestamp(now()));
+-- Insert sample data into email_index table
+INSERT INTO openmeet.email_index (email, user_id) VALUES ('john@example.com', uuid());
+INSERT INTO openmeet.email_index (email, user_id) VALUES ('jane@example.com', uuid());
 
-INSERT INTO events (event_id, creator_id, title, description, start_time, end_time, lat, lon, address, created_at, updated_at)
-VALUES (uuid(), 123e4567-e89b-12d3-a456-426614174000, 'Yoga in the Park', 'Relaxing yoga session', '2023-06-20 09:00:00', '2023-06-20 10:30:00', 40.7829, -73.9654, 'Central Park, New York, NY', toTimestamp(now()), toTimestamp(now()));
+-- Insert sample data into events table
+INSERT INTO events (event_id, creator_id, title, description, start_time, end_time, lat, lon, address, created_at, updated_at) VALUES (uuid(), uuid(), 'Sample Event 1', 'Description for event 1', toTimestamp(now()), toTimestamp(now() + 3600), 37.7749, -122.4194, '123 Sample St, San Francisco, CA', toTimestamp(now()), toTimestamp(now()));
+INSERT INTO events (event_id, creator_id, title, description, start_time, end_time, lat, lon, address, created_at, updated_at) VALUES (uuid(), uuid(), 'Sample Event 2', 'Description for event 2', toTimestamp(now()), toTimestamp(now() + 7200), 34.0522, -118.2437, '456 Sample Ave, Los Angeles, CA', toTimestamp(now()), toTimestamp(now()));
 
--- Populate Events by location table
-INSERT INTO events_by_location (location_bucket, event_id, creator_id, title, start_time, lat, lon)
-VALUES ('NYC', 123e4567-e89b-12d3-a456-426614174001, 123e4567-e89b-12d3-a456-426614174000, 'Tech Meetup', '2023-06-15 18:00:00', 40.7128, -74.0060);
+-- Insert sample data into comments table
+INSERT INTO comments (event_id, comment_id, user_id, content, created_at, updated_at) VALUES (uuid(), uuid(), uuid(), 'This is a comment for event 1', toTimestamp(now()), toTimestamp(now()));
+INSERT INTO comments (event_id, comment_id, user_id, content, created_at, updated_at) VALUES (uuid(), uuid(), uuid(), 'This is a comment for event 2', toTimestamp(now()), toTimestamp(now()));
 
-INSERT INTO events_by_location (location_bucket, event_id, creator_id, title, start_time, lat, lon)
-VALUES ('NYC', 123e4567-e89b-12d3-a456-426614174002, 123e4567-e89b-12d3-a456-426614174000, 'Yoga in the Park', '2023-06-20 09:00:00', 40.7829, -73.9654);
-
--- Populate Comments table
-INSERT INTO comments (event_id, comment_id, user_id, content, created_at, updated_at)
-VALUES (123e4567-e89b-12d3-a456-426614174001, uuid(), 123e4567-e89b-12d3-a456-426614174003, 'Looking forward to this meetup!', toTimestamp(now()), toTimestamp(now()));
-
-INSERT INTO comments (event_id, comment_id, user_id, content, created_at, updated_at)
-VALUES (123e4567-e89b-12d3-a456-426614174002, uuid(), 123e4567-e89b-12d3-a456-426614174004, 'Is this suitable for beginners?', toTimestamp(now()), toTimestamp(now()));
-
--- Populate User comments table
-INSERT INTO user_comments (user_id, comment_id, event_id, content, created_at)
-VALUES (123e4567-e89b-12d3-a456-426614174003, 123e4567-e89b-12d3-a456-426614174005, 123e4567-e89b-12d3-a456-426614174001, 'Looking forward to this meetup!', toTimestamp(now()));
-
-INSERT INTO user_comments (user_id, comment_id, event_id, content, created_at)
-VALUES (123e4567-e89b-12d3-a456-426614174004, 123e4567-e89b-12d3-a456-426614174006, 123e4567-e89b-12d3-a456-426614174002, 'Is this suitable for beginners?', toTimestamp(now()));
+-- Insert sample data into user_comments table
+INSERT INTO user_comments (user_id, comment_id, event_id, content, created_at) VALUES (uuid(), uuid(), uuid(), 'User comment for event 1', toTimestamp(now()));
+INSERT INTO user_comments (user_id, comment_id, event_id, content, created_at) VALUES (uuid(), uuid(), uuid(), 'User comment for event 2', toTimestamp(now()));

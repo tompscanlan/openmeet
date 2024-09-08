@@ -1,0 +1,78 @@
+---
+- name: Deploy Cassandra to Lab
+  hosts: cassandra
+  
+  roles:
+    - role: community.cassandra.cassandra_repository
+      vars:
+        cassandra_version: "41x"
+    - role: community.cassandra.cassandra_linux
+    - role: community.cassandra.cassandra_install
+
+  tasks:
+  
+    - name: add host into DNS
+      community.digitalocean.digital_ocean_domain_record:
+        state: present
+        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+        name: "{{ inventory_hostname }}"
+        domain: "{{ domain_name }}"
+        data: "{{ ansible_host }}"
+        ttl: 300
+        type: A
+      delegate_to: localhost
+
+
+    - name: install several packages
+      ansible.builtin.package:
+        name: "{{item}}"
+        state: present
+        update_cache: false
+      loop:
+        - certbot
+        - python3-certbot-dns-digitalocean
+        - python3-certbot-dns-route53
+
+    - name: write digitalocean creds to file
+      ansible.builtin.template:
+        src: do_creds.ini.j2
+        dest: /root/do_creds.ini
+        mode: '0600'
+
+    - name: get certificate
+      command: certbot certonly -n --dns-digitalocean --email tom@openmeet.com --dns-digitalocean-credentials /root/do_creds.ini --agree-tos -d "{{ inventory_hostname }}.{{ domain_name }}"
+
+    - name: Copy cassandra.yaml to /etc/cassandra/cassandra.yaml
+      copy:
+        src: ../database/cassandra.yaml
+        dest: /etc/cassandra/cassandra.yaml
+        mode: '0644'
+        owner: root
+        group: cassandra
+
+    - name: Ensure Cassandra directories have correct permissions
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: cassandra
+        group: cassandra
+        mode: '0755'
+      loop:
+        - /var/lib/cassandra
+        - /var/lib/cassandra/commitlog
+        - /var/lib/cassandra/data
+        - /var/log/cassandra
+
+    - name: restart cassandra
+      systemd:
+        name: cassandra
+        state: restarted
+        enabled: true
+
+    - name: install schema using cqlsh
+      copy:
+        src: ../database/schema.cql
+        dest: /tmp/schema.cql
+
+    - name: run cqlsh
+      command: cqlsh -f /tmp/schema.cql

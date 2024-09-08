@@ -1,0 +1,32 @@
+- name: Raise a droplet and turn it into a seed node
+  hosts: localhost
+  
+  pre_tasks:
+    - name: Create a new Droplet
+      community.digitalocean.digital_ocean_droplet:
+        state: present
+        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+        name: cassandra01
+        size: s-1vcpu-2gb # doctl compute size list
+        region: sfo3
+        image: ubuntu-22-04-x64
+        wait_timeout: 500
+        project: openmeet
+        ssh_keys: 
+          - 40292742
+          - 40292762
+      register: my_droplet
+
+    - name: print droplet info
+      debug:
+        var: my_droplet
+        
+    # - name: add host into ansible inventory
+    #   ansible.builtin.add_host:
+    #     name: "{{ my_droplet.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first | default('<none>', true) }}"
+    #     groups: cassandra
+    #     hostname: cassandra01
+    #     ansible_host: "{{ my_droplet.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first | default('<none>', true) }}"
+    #     ansible_user: root
+    #     ansible_port: 22
+    #     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
