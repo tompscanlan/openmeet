@@ -2,5 +2,5 @@ localhost ansible_connection=local
 
 [cassandra]
 # cassandra01 ansible_host=192.168.8.102 ansible_user=tscanlan ansible_become=yes ansible_become_user=root ansible_become_pass="{{ lookup('env', 'SUDO_PASSWORD') }}"
-cassandra01.sfo ansible_host=165.232.146.120 ansible_user=root domain_name=scanlanservices.com
+cassandra01.sfo ansible_host=209.38.72.159
 

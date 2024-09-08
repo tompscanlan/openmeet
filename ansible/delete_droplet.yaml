@@ -1,0 +1,36 @@
+- name: Delete a droplet
+  hosts: cassandra
+  
+  pre_tasks:
+    - name: Make Droplet absent
+      community.digitalocean.digital_ocean_droplet:
+        state: absent
+        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+        name: cassandra01
+        region: sfo3
+        image: ubuntu-22-04-x64
+        wait_timeout: 500
+        project: openmeet
+        unique_name: true
+      delegate_to: localhost
+      
+
+    - name: remove host from DNS
+      community.digitalocean.digital_ocean_domain_record:
+        state: absent
+        oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+        name: "{{ inventory_hostname }}"
+        domain: "{{ domain_name }}"
+        data: "{{ ansible_host }}"
+        ttl: 300
+        type: A
+      delegate_to: localhost
+    # - name: add host into ansible inventory
+    #   ansible.builtin.add_host:
+    #     name: "{{ my_droplet.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first | default('<none>', true) }}"
+    #     groups: cassandra
+    #     hostname: cassandra01
+    #     ansible_host: "{{ my_droplet.data.droplet.networks.v4 | selectattr('type', 'equalto', 'public') | map(attribute='ip_address') | first | default('<none>', true) }}"
+    #     ansible_user: root
+    #     ansible_port: 22
+    #     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
