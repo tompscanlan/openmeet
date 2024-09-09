@@ -1,0 +1,27 @@
+- name: debug following condition
+  debug:
+    msg: "Condition for raising droplets: Provider: {{ provider }}, Delete Nodes: {{ delete_nodes }}, Environment: {{ deploy_env }}, Type: {{ type }}, Project: {{ project }}, Inventory Hostname: {{ inventory_hostname }}, hostvars: {{ hostvars[inventory_hostname] }}"
+
+- name: Make Droplet absent
+  community.digitalocean.digital_ocean_droplet:
+    state: absent
+    oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+    name: "{{ do_name }}"
+    region: "{{ region }}"
+    wait_timeout: 500
+    unique_name: true
+  delegate_to: localhost
+  when: inventory_hostname != 'localhost' and 'cassandra_seed' in hostvars[inventory_hostname].do_tags
+  
+
+- name: remove host from DNS
+  community.digitalocean.digital_ocean_domain_record:
+    state: absent
+    oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+    name: "{{ do_name.split('.')[0] }}.{{region}}.{{deploy_env}}"
+    domain: "{{ domain_name }}"
+    data: "{{ ansible_host }}"
+    ttl: 300
+    type: A
+  delegate_to: localhost
+  when: inventory_hostname != "localhost" and "cassandra_seed" in hostvars[inventory_hostname].do_tags

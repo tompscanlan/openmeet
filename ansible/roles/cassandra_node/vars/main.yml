@@ -1,0 +1,16 @@
+---
+# vars file for cassandra_node
+ssh_key_ids:
+  - 40292742
+  - 40292762
+
+node_count: 1
+delete_nodes: false
+domain_name: scanlanservices.com
+provider: digitalocean
+environment: none
+project: none
+region: sfo3
+keystore_password: butterball32sundays
+truststore_password: butterball32sundays
+stores_dir: /etc/cassandra/stores

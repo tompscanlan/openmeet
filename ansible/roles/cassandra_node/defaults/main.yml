@@ -1,0 +1,7 @@
+---
+# defaults file for cassandra_node
+provider: digitalocean
+#provider: aws
+
+region: sfo3
+

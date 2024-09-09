@@ -1,0 +1,15 @@
+- name: Raise and Install a Cassandra Node
+  hosts:
+    - all
+    - localhost
+  gather_facts: false
+
+  roles:
+    - role: cassandra_node
+      vars:
+        deploy_env: dev
+        project: openmeet
+        type: cassandra_seed
+        provider: digitalocean
+        delete_nodes: true
+  tasks:

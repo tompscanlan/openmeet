@@ -1,0 +1,20 @@
+- name: Create Cassandra Droplets
+  community.digitalocean.digital_ocean_droplet:
+    state: present
+    oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+    name: "cassandra{{ '%02d' | format(item) }}.{{ region }}.{{ deploy_env }}.{{ domain_name }}"
+    size: s-1vcpu-2gb # doctl compute size list
+    region: sfo3
+    image: ubuntu-22-04-x64
+    wait_timeout: 500
+    project: openmeet
+    ssh_keys: "{{ ssh_key_ids }}"
+    unique_name: true
+    tags:
+      - "cassandra_seed"
+      - "openmeet"
+      - "dev"
+  loop: "{{ range(0, node_count - 1|int + 1)|list }}"
+  register: cassandra_droplets
+  delegate_to: localhost
+

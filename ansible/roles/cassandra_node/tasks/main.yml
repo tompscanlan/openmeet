@@ -1,0 +1,22 @@
+---
+# tasks file for cassandra_node
+
+- name: Deleting Droplets for Cassandra
+  include_tasks: delete_droplet.yaml
+  when: inventory_hostname != 'localhost' and provider == 'digitalocean' and delete_nodes == True and "cassandra_seed" in hostvars[inventory_hostname]['do_tags']
+
+- name: Creating Droplets for Cassandra
+  include_tasks: create_droplet.yaml
+  when: provider == 'digitalocean' and delete_nodes == False
+
+- name: debug following condition
+  debug:
+    msg: "Condition for installing Cassandra: Provider: {{ provider }}, Delete Nodes: {{ delete_nodes }}, Environment: {{ deploy_env }}, Type: {{ type }}, Project: {{ project }}, Inventory Hostname: {{ inventory_hostname }}, Hostvars: {{ hostvars[inventory_hostname] }}"
+
+- name: Install Cassandra on the New Node
+  include_tasks: install_cassandra.yaml
+  when: inventory_hostname != 'localhost' and provider == 'digitalocean' and delete_nodes == False
+
+- name: Install Cassandra Certs
+  include_tasks: install_cassandra_certs.yaml
+  when: inventory_hostname != 'localhost' and provider == 'digitalocean' and delete_nodes == False

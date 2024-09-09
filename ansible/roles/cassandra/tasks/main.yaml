@@ -1,0 +1,107 @@
+
+- name: Install Let's Encrypt Packages
+  ansible.builtin.package:
+    name: certbot, python3-certbot-dns-digitalocean, python3-certbot-dns-route53 
+    state: present
+    update_cache: false
+
+- name: Add Node into DNS {{ do_name.split('.')[0] }}.{{region}}.{{deploy_env}}.{{domain_name}}
+  community.digitalocean.digital_ocean_domain_record:
+    state: present
+    oauth_token: "{{ lookup('ansible.builtin.env', 'DO_API_TOKEN') }}"
+    name: "{{ do_name.split('.')[0] }}.{{region}}.{{deploy_env}}"
+    domain: "{{ domain_name }}"
+    data: "{{ inventory_hostname }}"
+    ttl: 300
+    type: A
+  delegate_to: localhost
+  when: inventory_hostname != 'localhost'
+
+- name: Update /etc/hosts with public IP addresses
+  ansible.builtin.shell:
+    cmd: grep -v {{ do_name }} /etc/hosts > /tmp/hosts && echo "{{ ansible_host }} {{ do_name }}" >> /tmp/hosts && mv /tmp/hosts /etc/hosts
+  when: inventory_hostname != 'localhost'
+
+- name: write digitalocean creds to file
+  ansible.builtin.template:
+    src: do_creds.ini.j2
+    dest: /root/do_creds.ini
+    mode: '0600'
+
+- name: get certificate
+  command: certbot certonly -n --dns-digitalocean --email tom@openmeet.com --dns-digitalocean-credentials /root/do_creds.ini --agree-tos -d "{{ do_name }}"
+
+- name: stop cassandra
+  systemd:
+    name: cassandra
+    state: stopped
+    enabled: true
+
+- name: Copy cassandra.yaml to /etc/cassandra/cassandra.yaml
+  template:
+    src: cassandra.yaml.j2
+    dest: /etc/cassandra/cassandra.yaml
+    mode: '0644'
+    owner: root
+    group: cassandra
+
+- name: Ensure Cassandra directories have correct permissions
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: cassandra
+    group: cassandra
+    mode: '0755'
+  loop:
+    - /var/lib/cassandra
+    - /var/lib/cassandra/commitlog
+    - /var/lib/cassandra/data
+    - /var/log/cassandra
+
+- name: remove old data
+  command: rm -rf /var/lib/cassandra/data/*
+  when: wipe_data
+
+- name: Manage Certs
+  include_tasks: certs.yaml
+
+- name: Copy schema.cql to /tmp
+  copy:
+    src: ../database/schema.cql
+    dest: /tmp/schema.cql
+
+
+
+- name: Start Cassandra service
+  systemd:
+    name: cassandra
+    state: started
+
+- name: Apply Schema
+  command: cqlsh {{ do_name }} -f /tmp/schema.cql
+  retries: 3
+  delay: 30
+  ignore_errors: true
+
+
+- name: Stop Cassandra
+  systemd:
+    name: cassandra
+    state: stopped
+
+
+- name: wipe data again
+  command: rm -rf /var/lib/cassandra/data/*
+  when: wipe_data
+
+- name: Restart Cassandra
+  systemd:
+    name: cassandra
+    state: started
+
+
+- name: Apply Schema
+  command: cqlsh {{ do_name }} -f /tmp/schema.cql
+  retries: 30
+  delay: 10
+  ignore_errors: true

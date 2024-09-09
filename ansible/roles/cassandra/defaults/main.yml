@@ -1,0 +1,6 @@
+---
+# defaults file for cassandra
+wipe_data: false
+stores_dir: /etc/cassandra/stores
+truststore_password: tasty_default_catchphrase
+keystore_password: tasty_default_catchphrase
