@@ -3,10 +3,10 @@
 This project is intended to be a lot like meetup.com or facebook groups, but for building local communities without selling your data to advertisers.  You can take this project and host your own instance laser focused on your neighboorhood, your church, university or other community based institution. Or you could be the parent who can can organize all the kids at the playground to a weekly event.  Do these things without losing control of your personal data.
 
 I want every user to be able to make sure their data can leave with them. I want communities to win, not engagement for facebook. 
-I want organizing a meetup to be as easy as possible of as many people as possible.
+I want organizing a meetup to be as easy as possible for as many people as possible.
 
 ## How to get started?
-Head to openmeet.com and sign up for an account. Or head to downloads/quickstart and run your own instance.
+Head to openmeet.net and sign up for an account. Or head to downloads/quickstart and run your own instance.
 
 ### Your own instance
 
@@ -28,10 +28,10 @@ Head to openmeet.com and sign up for an account. Or head to downloads/quickstart
 
 ## MVP
 
-* DB, API, and Frontend all in docker containers
-* Can CRUD users, and basic events
-* Can federate with other instances
-
+* I can invite a person to my contact list or event using a QR code on my phone app.
+* I can find groups near me based on interests.
+* I can create a group and invite people to join.
+* Able to pay group dues
 
 
 ## What does it mean to federate?

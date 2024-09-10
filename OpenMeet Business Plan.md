@@ -42,11 +42,80 @@ Our team consists of Tom Scanlan, an experienced software developer and operator
 
 
 ## 3. Market Analysis
-- Target Market
-- Industry Trends
-- Competitor Analysis
+
+### Target Market
+
+OpenMeet's target market is broad and inclusive, encompassing individuals aged 13 and up of all genders who are seeking companionship and community connections. Our platform caters to everyone who wants to:
+
+- Find like-minded individuals
+- Participate in local events and activities
+- Build meaningful relationships
+- Discover new interests and hobbies
+- Connect with their community
+
+By focusing on the universal human need for companionship, OpenMeet has the potential to appeal to a wide range of users across different age groups, backgrounds, and interests.
+
+### Industry Trends
+
+The events and social networking industry has seen significant growth in recent years, with a particular emphasis on digital platforms that facilitate real-world connections. The COVID-19 pandemic has further accelerated the need for innovative solutions that bring people together, both virtually and in-person.
+
+### Competitor Analysis
+
+OpenMeet's main competitors in the event organization and community-building space include:
+
+1. Meetup.com: A well-established platform for organizing local events and interest groups. Meetup has a ghost town problem where groups are populated with people who are no longer active. It's difficult to trust the groups to be active.  Meetup.com has a $30 fee for setting up events, which prices many people out from being able to participate in building community.  Meetup.com has resurrected groups who's owners had left and ran them as puppets, challenging ownership of the group and contained created content.
+2. Facebook Groups: Leverages the vast user base of Facebook to create community spaces.  You are the product.  You data is sold, and you are shown ads.  There can be a toxic element to these groups.
+3. Eventbrite: Primarily focused on event ticketing and discovery.  If you want to charge people to attend an event, this is great. If you want to build a community, this is not so great.
+
+While these competitors have significant market share, OpenMeet differentiates itself through:
+
+- distributed architecture avoids having a centralized service provider generating money off your engagement
+- Enhanced data privacy and user control 
+- Community-driven development
+- serving communities, not serving users up to advertisers
+
+By addressing the growing concerns around data ownership and privacy, OpenMeet is positioned to capture users who are looking for alternatives to centralized platforms.
 
 ## 4. Product and Services
+## 4. Product Description
+
+OpenMeet is an innovative, open-source platform designed to facilitate meaningful connections and community building. It consists of two main components:
+
+1. The OpenMeet software: A distributed, open-source application that can be self-hosted by communities or organizations.
+2. OpenMeet.net: A global public instance hosted at openmeet.net, providing immediate access to the platform for users worldwide.
+
+### Key Features
+
+1. **Distributed Architecture**: OpenMeet's decentralized design ensures data privacy and gives communities control over their information.
+
+2. **Open-Source**: The platform's code is publicly available, promoting transparency and allowing for community-driven development and customization. Most importantly, no central authority means OpenMeet as an entity can cease to be, and the communities don't have to cease running the platform.
+
+3. **QR Code Invitations**: A unique feature allowing users to invite new people to their instance's groups, or events in person using QR codes, balancing ease of connection with privacy protection.
+
+4. **Privacy-Focused Introductions**: Users can connect with new people without immediately revealing extensive personal information, fostering a safe environment for building relationships.
+
+5. **Event Organization**: Tools for creating, managing, and discovering local events and activities.
+
+6. **Interest-Based Groups**: Ability to form and join groups based on shared interests, hobbies, or goals.
+
+7. **Flexible Hosting Options**: Communities can choose to self-host their own instance or use the global public instance at OpenMeet.net.
+
+8. **Impromptu Events**: Tools for creating and discovering events that happen right now.
+
+### How It Works
+
+1. User Alice can access OpenMeet through OpenMeet.net. There she can find nearby people and events that are public.
+2. User Bob can access OpenMeet through a self-hosted or community hosted instance by going to a URL that entity controls, like AnotherMeet.net.
+3. Alice and Bob create profiles with as much or as little information as they're comfortable sharing. Other users see a limited version of that profile based on the privacy settings the user selects.
+4. Alice and Bob can not find each other, as they are on seperate instances.
+5. Bob can invite Alice to an event on his instance.
+6. Alice, with the invitation, can create an account and login to Bob's instance.
+7. Now Bob can find Alice on his instance, and they can interact there.
+8. Now when Alice looks at her event feed, it is coming from both instances, but she is not doing extra work to make that happen.
+4. When meeting new people in person, Alice can share a QR code that provides a limited introduction and invitation to connect on the platform.
+
+OpenMeet's unique approach to privacy, open-source nature, and innovative features set it apart in the social networking and event organization space. By prioritizing user control and data privacy, OpenMeet aims to create a more trustworthy and community-driven alternative to existing centralized socialplatforms.
+
 - Platform Features
 - Unique Selling Proposition
 
