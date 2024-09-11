@@ -300,7 +300,22 @@ Key components:
 ## Existing solutions:
 * Meetup
 * Eventbrite
-* Facebook Events
+* Facebook communities
 * Nextdoor
 * https://lu.ma/
 * https://partiful.com/
+
+
+## Stories
+
+1. Tom is a dad who has a 6 year old.  His daughter plays well with a few people they meet on the playground. He wants a way to get his kid together with these other kids again.
+In one scenario, He asks for or gives a phone number noone ever remembers to use. 
+In another, he could open OpenMeet and add a new location based group which pulls up a QR code on Tom's phone, which when scanned by the other person leads to an invitation to meet again with a little info about Tom.  The person can decline, and we're done. Or they can accept and 
+they are greeted with a group for just Tom and the other person or people, if multiple people scan the QR code.  Since Tom created the group, he will get final approval to let in each person before they are admitted to the group. Tom can post a message to the group that he's planning on a park trip in a few days. The other people can see that activity and decide to join again. 
+In tom's history he can name this group "Park Day", and schedule events for the future.  Or in the moment, he can say I'm headed to the park now, "anyone want to join?" to the same group.  Additionally, the group owner can allow any member to 
+
+2. Alice is talking at a party and feels like she recognizes a person.  She can flash a QR code to the person which allows the person to see Alice's common friends for a few minutes, and sees a common connection that they both adore.
+
+3. Bob is feeling bored tonight. He is new in town and doesn't know anyone. He can join OpenMeet.net and find a public group by interests near his location, happening tonight.  In a small town, that list is likly to be empty, but in a more dense area, you might find a few events that are public and going on in an evening.  Bob chooses a watch party for a sporting event and the local pub.  While there he meets a nice couple that happen to live on his street.  Since they are so close he suggests they make a neighborhood group to check up on loud noises at night or other little emergencies. They respond with there is already one, and Bob gets invited to join the Neighborhood instance. Because this is a group for a neighborhood, the people participating are shareing a different kind of information.  There might be news about lost items, or that #213 will be out of town for the week, if someon could grab the mail, that'd be great.
+
+4. Professor Candice teaches a class of 30 students.  She creates a group for the class on the school's instance. Now she can post the calendar once, and the class all have access.  Students may form study groups, and weekend hang out groups. Each can be communicated to in real time by the participants. 
